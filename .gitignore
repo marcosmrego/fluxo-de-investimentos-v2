@@ -1,0 +1,55 @@
+# ── Ambiente / Credenciais (NUNCA commitar!) ──────────────────────
+.env
+*.env
+google_token*.json
+token*.json
+credentials*.json
+client_secret*.json
+
+# ── Senhas e chaves ───────────────────────────────────────────────
+# Qualquer arquivo com senhas hardcoded (backup/legado)
+*password*
+*secret*
+
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.so
+
+# ── Ambiente virtual ──────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ── IDE ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Outputs gerados ───────────────────────────────────────────────
+reports/*.pdf
+output/*.png
+output/*.jpg
+output/*.svg
+
+# ── Logs e temporários ────────────────────────────────────────────
+*.log
+*.tmp
+tmp/
+temp/
+.DS_Store
+Thumbs.db
+
+# ── Dados sensíveis do sistema ────────────────────────────────────
+*.rdb
+*.dump
+backup/
