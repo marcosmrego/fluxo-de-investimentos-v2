@@ -29,12 +29,33 @@ CLIMATE = {
 PLOTLY_TEMPLATE = {
     "layout": {
         "plot_bgcolor": CLIMATE["surface"],
-        "paper_bgcolor": CLIMATE["bg"],
+        "paper_bgcolor": CLIMATE["surface"],
         "font": {"color": CLIMATE["text2"], "family": "Inter, system-ui, sans-serif", "size": 12},
-        "xaxis": {"gridcolor": CLIMATE["border"], "linecolor": CLIMATE["border_accent"], "zerolinecolor": CLIMATE["border_accent"]},
-        "yaxis": {"gridcolor": CLIMATE["border"], "linecolor": CLIMATE["border_accent"], "zerolinecolor": CLIMATE["border_accent"]},
-        "margin": {"l": 40, "r": 20, "t": 50, "b": 30},
-        "title": {"font": {"color": CLIMATE["text"], "size": 16, "family": "Space Grotesk, sans-serif"}},
+        "xaxis": {
+            "gridcolor": "rgba(255,255,255,0.04)",
+            "linecolor": "rgba(255,255,255,0.08)",
+            "zerolinecolor": "rgba(255,255,255,0.08)",
+            "zerolinewidth": 1,
+        },
+        "yaxis": {
+            "gridcolor": "rgba(255,255,255,0.04)",
+            "linecolor": "rgba(255,255,255,0.08)",
+            "zerolinecolor": "rgba(255,255,255,0.08)",
+            "zerolinewidth": 1,
+        },
+        "margin": {"l": 20, "r": 20, "t": 50, "b": 20},
+        "title": {"font": {"color": CLIMATE["text"], "size": 14, "family": "Space Grotesk, sans-serif"}},
+        "legend": {
+            "font": {"color": CLIMATE["text3"], "size": 11},
+            "bgcolor": "rgba(0,0,0,0)",
+        },
+        "hoverlabel": {
+            "bgcolor": CLIMATE["surface2"],
+            "font": {"color": CLIMATE["text"], "family": "Inter, sans-serif", "size": 12},
+            "bordercolor": CLIMATE["border_accent"],
+        },
+        "bargap": 0.25,
+        "bargroupgap": 0.1,
     }
 }
 
