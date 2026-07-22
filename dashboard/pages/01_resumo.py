@@ -9,7 +9,7 @@ from data.queries import (
     get_rentabilidade_historica, get_distribuicao_tipo, get_posicoes
 )
 from data.metrics import twr
-from components.theme import CLEAN, PLOTLY_TEMPLATE
+from components.theme import CLIMATE, PLOTLY_TEMPLATE
 
 st.title("📋 Resumo da Carteira")
 
@@ -45,7 +45,7 @@ with col1:
             template=None, height=350
         )
         fig.update_layout(**PLOTLY_TEMPLATE["layout"])
-        fig.update_traces(line_color=CLEAN["accent"], line_width=2)
+        fig.update_traces(line_color=CLIMATE["accent"], line_width=2)
         fig.update_yaxes(tickprefix="R$ ")
         st.plotly_chart(fig, width='stretch')
     else:
@@ -57,7 +57,7 @@ with col2:
     if not dist.empty:
         fig = px.pie(
             dist, values="valor", names="tipo",
-            color_discrete_sequence=["#0969DA", "#1A7F37", "#8250DF", "#9A6700", "#BC4C00"],
+            color_discrete_sequence=["#5EC8F8", "#FFA726", "#EF5350", "#4ADE80", "#A78BFA"],
             height=350
         )
         fig.update_layout(**PLOTLY_TEMPLATE["layout"])

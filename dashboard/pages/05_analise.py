@@ -6,7 +6,7 @@ import pandas as pd
 
 from data.queries import get_indicadores
 from data.metrics import bazin_preco_teto, graham_preco_justo
-from components.theme import CLEAN, PLOTLY_TEMPLATE
+from components.theme import CLIMATE, PLOTLY_TEMPLATE
 
 st.title("🔬 Análise Fundamentalista")
 
@@ -55,7 +55,7 @@ with col1:
         df.dropna(subset=["roe", "p_vp"]),
         x="p_vp", y="roe", text="ticker",
         template=None, height=350,
-        color_discrete_sequence=[CLEAN["accent"]]
+        color_discrete_sequence=[CLIMATE["accent"]]
     )
     fig.update_layout(**PLOTLY_TEMPLATE["layout"])
     fig.update_traces(textposition="top center", marker=dict(size=12))
@@ -69,7 +69,7 @@ with col2:
     fig = px.bar(
         dy_rank, x="dividend_yield", y="ticker",
         template=None, height=350, orientation="h",
-        color_discrete_sequence=[CLEAN["green"]]
+        color_discrete_sequence=[CLIMATE["positive"]]
     )
     fig.update_layout(**PLOTLY_TEMPLATE["layout"])
     fig.update_xaxes(ticksuffix="%", title="DY")

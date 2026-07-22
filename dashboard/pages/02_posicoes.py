@@ -5,7 +5,7 @@ import pandas as pd
 
 from data.queries import get_posicoes, get_patrimonio_total
 from data.metrics import percentual_carteira
-from components.theme import CLEAN
+from components.theme import CLIMATE
 
 st.title("📑 Posições")
 

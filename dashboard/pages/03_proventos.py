@@ -5,7 +5,7 @@ import plotly.express as px
 import pandas as pd
 
 from data.queries import get_proventos, get_proventos_agregado
-from components.theme import CLEAN, PLOTLY_TEMPLATE
+from components.theme import CLIMATE, PLOTLY_TEMPLATE
 
 st.title("💵 Proventos")
 
@@ -33,7 +33,7 @@ mensal = mensal.sort_values("ano_mes")
 fig = px.bar(
     mensal, x="ano_mes", y="valor",
     template=None, height=350,
-    color_discrete_sequence=[CLEAN["green"]]
+    color_discrete_sequence=[CLIMATE["positive"]]
 )
 fig.update_layout(**PLOTLY_TEMPLATE["layout"])
 fig.update_yaxes(tickprefix="R$ ")

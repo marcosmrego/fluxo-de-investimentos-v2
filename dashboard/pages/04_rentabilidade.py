@@ -6,7 +6,7 @@ import pandas as pd
 
 from data.queries import get_rentabilidade_historica
 from data.metrics import twr
-from components.theme import CLEAN, PLOTLY_TEMPLATE
+from components.theme import CLIMATE, PLOTLY_TEMPLATE
 
 st.title("Rentabilidade")
 
@@ -33,7 +33,7 @@ st.subheader("Evolucao do Patrimonio")
 
 fig1 = px.line(df, x="data", y="valor_total", template=None, height=350)
 fig1.update_layout(**PLOTLY_TEMPLATE["layout"])
-fig1.update_traces(line_color=CLEAN["accent"], line_width=2)
+fig1.update_traces(line_color=CLIMATE["accent"], line_width=2)
 fig1.update_yaxes(tickprefix="R$ ")
 st.plotly_chart(fig1, width='stretch')
 
@@ -43,7 +43,7 @@ st.subheader("Rentabilidade Diaria (%)")
 df["positive"] = df["rentabilidade"] >= 0
 fig2 = px.bar(df, x="data", y="rentabilidade", template=None, height=300,
               color="positive",
-              color_discrete_map={True: CLEAN["green"], False: CLEAN["red"]})
+              color_discrete_map={True: CLIMATE["positive"], False: CLIMATE["critical"]})
 fig2.update_layout(**PLOTLY_TEMPLATE["layout"], showlegend=False)
 fig2.update_yaxes(ticksuffix="%")
 st.plotly_chart(fig2, width='stretch')
