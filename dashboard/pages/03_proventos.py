@@ -26,7 +26,7 @@ if df.empty:
 st.markdown("---")
 st.subheader("📊 Proventos Mensais (últimos 24 meses)")
 
-df["ano_mes"] = df["data_pgto"].dt.to_period("M").astype(str)
+df["ano_mes"] = pd.to_datetime(df["data_pgto"]).dt.to_period("M").astype(str)
 mensal = df.groupby("ano_mes")["valor"].sum().reset_index()
 mensal = mensal.sort_values("ano_mes")
 
@@ -38,7 +38,7 @@ fig = px.bar(
 fig.update_layout(**PLOTLY_TEMPLATE["layout"])
 fig.update_yaxes(tickprefix="R$ ")
 fig.update_xaxes(title="")
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width='stretch')
 
 # ── Tabela de proventos ──────────────────────────────────────
 st.markdown("---")
@@ -53,5 +53,5 @@ st.dataframe(
         "tipo": "Tipo",
     },
     hide_index=True,
-    use_container_width=True,
+    width='stretch',
 )

@@ -41,7 +41,7 @@ st.dataframe(
         "osc_12m": st.column_config.NumberColumn("Osc. 12M", format="%.1f%%"),
     },
     hide_index=True,
-    use_container_width=True,
+    width='stretch',
 )
 
 # ── Gráfico: ROE vs P/VP ─────────────────────────────────────
@@ -61,7 +61,7 @@ with col1:
     fig.update_traces(textposition="top center", marker=dict(size=12))
     fig.update_xaxes(title="P/VP")
     fig.update_yaxes(title="ROE (%)", ticksuffix="%")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 with col2:
     st.subheader("Ranking: Dividend Yield")
@@ -74,7 +74,7 @@ with col2:
     fig.update_layout(**PLOTLY_TEMPLATE["layout"])
     fig.update_xaxes(ticksuffix="%", title="DY")
     fig.update_yaxes(title="")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 # ── Bazin & Graham ───────────────────────────────────────────
 st.markdown("---")
@@ -99,7 +99,7 @@ for _, row in df.iterrows():
 
 if calculos:
     calc_df = pd.DataFrame(calculos)
-    st.dataframe(calc_df, hide_index=True, use_container_width=True)
+    st.dataframe(calc_df, hide_index=True, width='stretch')
     st.caption(
         "**Bazin:** Preço máximo baseado no DY médio (yield desejado = 6%). "
         "**Graham:** √(22.5 × LPA × VPA). Valores são estimativas simplificadas."

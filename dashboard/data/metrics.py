@@ -40,15 +40,19 @@ def graham_preco_justo(lpa: float, vpa: float) -> float:
     return round(np.sqrt(22.5 * lpa * vpa), 2)
 
 
-def percentual_carteira(saldo_atual: float, total_carteira: float) -> float:
+def percentual_carteira(saldo_atual, total_carteira) -> float:
     """% que um ativo representa na carteira."""
+    saldo_atual = float(saldo_atual or 0)
+    total_carteira = float(total_carteira or 0)
     if total_carteira <= 0:
         return 0.0
     return round((saldo_atual / total_carteira) * 100, 2)
 
 
-def yield_on_cost(proventos_12m: float, custo_total: float) -> float:
+def yield_on_cost(proventos_12m, custo_total) -> float:
     """Yield on cost: proventos 12m / custo total."""
+    proventos_12m = float(proventos_12m or 0)
+    custo_total = float(custo_total or 0)
     if custo_total <= 0:
         return 0.0
     return round((proventos_12m / custo_total) * 100, 2)

@@ -47,7 +47,7 @@ with col1:
         fig.update_layout(**PLOTLY_TEMPLATE["layout"])
         fig.update_traces(line_color=CLEAN["accent"], line_width=2)
         fig.update_yaxes(tickprefix="R$ ")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     else:
         st.info("Sem dados de rentabilidade histórica.")
 
@@ -62,7 +62,7 @@ with col2:
         )
         fig.update_layout(**PLOTLY_TEMPLATE["layout"])
         fig.update_traces(textinfo="label+percent")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     else:
         st.info("Sem dados de distribuição.")
 
@@ -81,5 +81,5 @@ if not posicoes.empty:
             "rentabilidade_pct": st.column_config.NumberColumn("Rent. %", format="%.2f%%"),
         },
         hide_index=True,
-        use_container_width=True,
+        width='stretch',
     )

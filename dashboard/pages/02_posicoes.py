@@ -59,7 +59,7 @@ st.dataframe(
         "pct_carteira": st.column_config.NumberColumn("% Carteira", format="%.1f%%"),
     },
     hide_index=True,
-    use_container_width=True,
+    width='stretch',
 )
 
 # ── Totais ───────────────────────────────────────────────────
