@@ -52,4 +52,4 @@ Thumbs.db
 # ── Dados sensíveis do sistema ────────────────────────────────────
 *.rdb
 *.dump
-backup/
+backup/dashboard-streamlit/
