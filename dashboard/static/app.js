@@ -28,7 +28,12 @@ function fmtPct(v) { return v != null ? (v >= 0 ? "+" : "") + v.toFixed(2) + "%"
 function fmtPctPlain(v) { return v != null ? v.toFixed(2) + "%" : "—"; }
 function fmtInt(v) { return v != null ? v.toLocaleString("pt-BR") : "—"; }
 function fmtQty(v) { return v != null ? Number(v).toLocaleString("pt-BR", {maximumFractionDigits: 6}) : "—"; }
-function fmtDate(v) { return v ? new Date(v).toLocaleDateString("pt-BR") : "—"; }
+function fmtDate(v) {
+    if (!v) return "—";
+    const dateOnly = String(v).slice(0, 10).split("-");
+    if (dateOnly.length === 3) return `${dateOnly[2]}/${dateOnly[1]}/${dateOnly[0]}`;
+    return "—";
+}
 function safe(v) {
     return String(v ?? "—").replace(/[&<>'"]/g, ch => ({
         "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
@@ -256,6 +261,7 @@ async function atualizarPosicoes() {
         const res = await fetch(`${API_BASE}/api/posicoes`);
         if (!res.ok) throw new Error(res.status);
         positionData = await res.json();
+        document.getElementById("phase-label").textContent = "Posicao atual";
         document.getElementById("pos-count").textContent = positionData.quantidade_posicoes;
         document.getElementById("pos-coverage").textContent = `${positionData.posicoes_com_cotacao} com cotacao`;
         document.getElementById("pos-cost").textContent = fmtBRL(positionData.custo_total);
@@ -289,17 +295,17 @@ function renderPosicoes() {
         const resultClass = r.lucro_prejuizo == null ? "" : r.lucro_prejuizo >= 0 ? "positive" : "negative";
         return `
             <tr class="${r.status === "ok" ? "" : "row-pending"}">
-                <td><span class="status-chip status-${safe(r.status)}"><i></i>${statusLabel}</span></td>
-                <td><div class="asset-cell"><strong>${safe(r.ticker)}</strong><small>${safe(r.nome)}</small></div></td>
-                <td><span class="asset-type">${safe(r.tipo)}</span></td>
-                <td class="numeric">${fmtQty(r.quantidade_total)}</td>
-                <td class="numeric">${fmtBRL(r.preco_medio)}</td>
-                <td class="numeric">${fmtBRL(r.custo_total)}</td>
-                <td class="numeric"><strong>${fmtBRL(r.preco_atual)}</strong><small>${fmtDate(r.data_cotacao)}</small></td>
-                <td class="numeric">${fmtBRL(r.saldo_atual)}</td>
-                <td class="numeric ${resultClass}">${fmtBRL(r.lucro_prejuizo)}<small>${fmtPctPlain(r.rentabilidade_pct)}</small></td>
-                <td class="numeric">${fmtPctPlain(r.pct_carteira)}</td>
-                <td>${fmtDate(r.atualizado_em)}</td>
+                <td data-label="Status"><span class="status-chip status-${safe(r.status)}"><i></i>${statusLabel}</span></td>
+                <td data-label="Ativo"><div class="asset-cell"><strong>${safe(r.ticker)}</strong><small>${safe(r.nome)}</small></div></td>
+                <td data-label="Classe"><span class="asset-type">${safe(r.tipo)}</span></td>
+                <td data-label="Quantidade" class="numeric">${fmtQty(r.quantidade_total)}</td>
+                <td data-label="Preco medio" class="numeric">${fmtBRL(r.preco_medio)}</td>
+                <td data-label="Custo" class="numeric">${fmtBRL(r.custo_total)}</td>
+                <td data-label="Preco atual" class="numeric"><strong>${fmtBRL(r.preco_atual)}</strong><small>${fmtDate(r.data_cotacao)}</small></td>
+                <td data-label="Valor coberto" class="numeric">${fmtBRL(r.saldo_atual)}</td>
+                <td data-label="Resultado" class="numeric ${resultClass}">${fmtBRL(r.lucro_prejuizo)}<small>${fmtPctPlain(r.rentabilidade_pct)}</small></td>
+                <td data-label="Peso" class="numeric">${fmtPctPlain(r.pct_carteira)}</td>
+                <td data-label="Atualizacao">${fmtDate(r.atualizado_em)}</td>
             </tr>`;
     }).join("");
 

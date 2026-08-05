@@ -403,7 +403,30 @@ header h1 { font-size: 25px; letter-spacing: -.8px; }
     header, .tabs-nav, .tab-panel { padding-left: 18px; padding-right: 18px; }
     .position-hero { align-items: flex-start; flex-direction: column; }
     .as-of { text-align: left; }
-    .position-summary { grid-template-columns: 1fr; }
+    .position-summary { grid-template-columns: 1fr 1fr; }
     .position-toolbar { grid-template-columns: 1fr; }
     .position-summary article { min-height: auto; }
+    .position-summary article { padding: 16px; }
+    .position-summary strong { font-size: 21px; margin-top: 9px; }
+    .position-card { overflow: visible; background: transparent; border: 0; box-shadow: none; }
+    .position-card .section-heading { padding-left: 0; padding-right: 0; }
+    .position-card .table-wrap { overflow: visible; }
+    .position-card table, .position-card tbody { display: block; }
+    .position-card thead { display: none; }
+    .position-card tr {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px;
+        background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+        padding: 16px; margin-bottom: 10px;
+    }
+    .position-card td { display: block; padding: 0; border: 0; white-space: normal; text-align: left; }
+    .position-card td::before {
+        content: attr(data-label); display: block; color: var(--text-3); font-size: 9px;
+        font-weight: 700; letter-spacing: .7px; text-transform: uppercase; margin-bottom: 3px;
+    }
+    .position-card td:nth-child(1), .position-card td:nth-child(2) { grid-column: 1 / -1; }
+    .position-card .caption { padding-left: 0; padding-right: 0; }
+}
+
+@media (max-width: 420px) {
+    .position-summary { grid-template-columns: 1fr; }
 }
