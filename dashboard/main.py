@@ -2,14 +2,13 @@
 
 import os
 from pathlib import Path
-from datetime import date, timedelta
-
-import numpy as np
 from dotenv import load_dotenv
-from fastapi import FastAPI, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import create_engine, text
+from sqlalchemy import URL, create_engine, text
+
+from dashboard.metrics import percentage_change, portfolio_weight
 
 # ── DB Config ──────────────────────────────────────────────────
 _env_path = Path(__file__).resolve().parent.parent / ".env"
@@ -25,14 +24,16 @@ if not _password:
                 _password = line.split("=", 1)[1].strip()
                 break
 
-DB_URL = (
-    f"postgresql://{os.environ.get('DB_USER', 'postgres')}:{_password}"
-    f"@{os.environ.get('DB_HOST', '212.85.22.227')}:"
-    f"{os.environ.get('DB_PORT', '5432')}/"
-    f"{os.environ.get('DB_NAME', 'carteira_investimentos')}"
+DB_URL = URL.create(
+    "postgresql+psycopg2",
+    username=os.environ.get("DB_USER", "postgres"),
+    password=_password,
+    host=os.environ.get("DB_HOST", "localhost"),
+    port=int(os.environ.get("DB_PORT", "5432")),
+    database=os.environ.get("DB_NAME", "carteira_investimentos"),
 )
 
-engine = create_engine(DB_URL)
+engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=300)
 
 # ── App ────────────────────────────────────────────────────────
 app = FastAPI(title="Dashboard Carteira")
@@ -69,52 +70,36 @@ async def status():
         pat = _one(conn.execute(text("""
             SELECT
                 COALESCE(SUM(c.fechamento * p.quantidade_total), 0) AS valor_atual,
-                COALESCE(SUM(p.custo_total), 0) AS custo_total
+                COALESCE(SUM(p.custo_total) FILTER (WHERE c.fechamento IS NOT NULL), 0) AS custo_coberto,
+                COALESCE(SUM(p.custo_total), 0) AS custo_total,
+                COUNT(*) FILTER (WHERE c.fechamento IS NULL) AS posicoes_sem_cotacao
             FROM investimentos.posicoes p
             LEFT JOIN LATERAL (
                 SELECT fechamento FROM investimentos.cotacoes
                 WHERE ticker = p.ticker ORDER BY data DESC LIMIT 1
             ) c ON true
         """)).fetchall(),
-            ["valor_atual", "custo_total"])
-
-        # Proventos
-        prov = _one(conn.execute(text("""
-            SELECT
-                COALESCE(SUM(CASE WHEN data_pgto >= DATE_TRUNC('year', NOW()) THEN valor END), 0) AS ano,
-                COALESCE(SUM(CASE WHEN data_pgto >= DATE_TRUNC('month', NOW()) THEN valor END), 0) AS mes
-            FROM investimentos.proventos
-        """)).fetchall(),
-            ["ano", "mes"])
-
-        # Rentabilidade historica (90 dias)
-        rent = _df(conn.execute(text("""
-            SELECT data, valor_total, custo_total, rentabilidade
-            FROM investimentos.rentabilidade_diaria
-            ORDER BY data DESC LIMIT 90
-        """)).fetchall(),
-            ["data", "valor_total", "custo_total", "rentabilidade"])
+            ["valor_atual", "custo_coberto", "custo_total", "posicoes_sem_cotacao"])
 
     val = pat["valor_atual"] or 0
-    custo = pat["custo_total"] or 0
-    lucro = val - custo
-    rent_pct = (lucro / custo * 100) if custo > 0 else 0
-
-    # TWR
-    twr_val = 0.0
-    if rent:
-        returns = [r["rentabilidade"] / 100 for r in rent if r["rentabilidade"] is not None]
-        if returns:
-            twr_val = round((float(np.prod([1 + r for r in returns])) - 1) * 100, 2)
+    custo_coberto = pat["custo_coberto"] or 0
+    cobertura_completa = pat["posicoes_sem_cotacao"] == 0
+    lucro = val - custo_coberto if cobertura_completa else None
+    rent_pct = (lucro / custo_coberto * 100) if lucro is not None and custo_coberto > 0 else None
 
     return {
-        "patrimonio": round(val, 2),
-        "custo_total": round(custo, 2),
-        "lucro": round(lucro, 2),
-        "rentabilidade_pct": round(rent_pct, 2),
-        "twr_90d": twr_val,
-        "proventos_ano": round(prov["ano"] or 0, 2),
-        "proventos_mes": round(prov["mes"] or 0, 2),
+        "patrimonio_coberto": round(val, 2),
+        "patrimonio": round(val, 2) if cobertura_completa else None,
+        "custo_total": round(pat["custo_total"] or 0, 2),
+        "lucro": round(lucro, 2) if lucro is not None else None,
+        "rentabilidade_pct": round(rent_pct, 2) if rent_pct is not None else None,
+        "cobertura_completa": cobertura_completa,
+        "posicoes_sem_cotacao": pat["posicoes_sem_cotacao"],
+        "twr_90d": None,
+        "twr_status": "indisponivel_sem_fluxos_de_caixa",
+        "proventos_ano": None,
+        "proventos_mes": None,
+        "proventos_status": "indisponiveis_sem_quantidade_na_data_com",
     }
 
 
@@ -133,11 +118,15 @@ async def posicoes(
                 ROUND((c.fechamento - p.preco_medio) * p.quantidade_total, 2) AS lucro_prejuizo,
                 ROUND(((c.fechamento - p.preco_medio) / p.preco_medio) * 100, 2) AS rentabilidade_pct,
                 ROUND(c.fechamento * p.quantidade_total, 2) AS saldo_atual,
-                c.variacao_pct AS var_dia_pct
+                c.variacao_pct AS var_dia_pct,
+                c.data AS data_cotacao,
+                p.atualizado_em,
+                (a.ticker IS NOT NULL) AS cadastrado,
+                (c.fechamento IS NOT NULL) AS possui_cotacao
             FROM investimentos.posicoes p
             LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
             LEFT JOIN LATERAL (
-                SELECT fechamento, variacao_pct FROM investimentos.cotacoes
+                SELECT fechamento, variacao_pct, data FROM investimentos.cotacoes
                 WHERE ticker = p.ticker ORDER BY data DESC LIMIT 1
             ) c ON true
             ORDER BY saldo_atual DESC NULLS LAST
@@ -145,7 +134,11 @@ async def posicoes(
             ["ticker", "nome", "tipo", "setor",
              "quantidade_total", "preco_medio", "custo_total",
              "preco_atual", "lucro_prejuizo", "rentabilidade_pct",
-             "saldo_atual", "var_dia_pct"])
+             "saldo_atual", "var_dia_pct", "data_cotacao", "atualizado_em",
+             "cadastrado", "possui_cotacao"])
+
+    # O peso sempre usa a carteira completa, mesmo quando a tabela está filtrada.
+    portfolio_total = sum(r["saldo_atual"] or 0 for r in rows)
 
     # Filtros
     if tipo and tipo != "Todos":
@@ -154,11 +147,28 @@ async def posicoes(
         rows = [r for r in rows if r["setor"] == setor]
 
     # Calcular % carteira
-    total = sum(r["saldo_atual"] or 0 for r in rows)
+    filtered_total = sum(r["saldo_atual"] or 0 for r in rows)
+    filtered_cost = sum(r["custo_total"] or 0 for r in rows)
     for r in rows:
-        r["pct_carteira"] = round((r["saldo_atual"] or 0) / total * 100, 2) if total > 0 else 0
+        r["pct_carteira"] = portfolio_weight(r["saldo_atual"], portfolio_total)
+        if not r["cadastrado"]:
+            r["status"] = "sem_cadastro"
+        elif not r["possui_cotacao"]:
+            r["status"] = "sem_cotacao"
+        else:
+            r["status"] = "ok"
 
-    return {"posicoes": rows, "total_saldo": round(total, 2)}
+    return {
+        "posicoes": rows,
+        "quantidade_posicoes": len(rows),
+        "posicoes_com_cotacao": sum(1 for r in rows if r["possui_cotacao"]),
+        "posicoes_sem_cotacao": sum(1 for r in rows if not r["possui_cotacao"]),
+        "posicoes_sem_cadastro": sum(1 for r in rows if not r["cadastrado"]),
+        "custo_total": round(filtered_cost, 2),
+        "total_saldo": round(filtered_total, 2),
+        "total_carteira": round(portfolio_total, 2),
+        "cobertura_completa": all(r["possui_cotacao"] for r in rows),
+    }
 
 
 @app.get("/api/filtros")
@@ -208,9 +218,12 @@ async def rentabilidade(dias: int = Query(90, ge=30, le=365)):
     # Ordenar cronologicamente
     rows.sort(key=lambda r: str(r["data"]))
 
-    # TWR
-    returns = [r["rentabilidade"] / 100 for r in rows if r["rentabilidade"] is not None]
-    twr_val = round((float(np.prod([1 + r for r in returns])) - 1) * 100, 2) if returns else 0
+    # Variação do patrimônio observado. Não é TWR: a base atual ainda não
+    # registra fluxos de caixa por subperíodo de forma apropriada.
+    variacao_patrimonio = percentage_change(
+        rows[0]["valor_total"] if rows else None,
+        rows[-1]["valor_total"] if rows else None,
+    )
 
     # Serializar datas
     serialized = []
@@ -224,7 +237,13 @@ async def rentabilidade(dias: int = Query(90, ge=30, le=365)):
             "rentabilidade": float(r["rentabilidade"]) if r["rentabilidade"] is not None else 0,
         })
 
-    return {"historico": serialized, "twr": twr_val}
+    return {
+        "historico": serialized,
+        "twr": None,
+        "twr_status": "indisponivel_sem_fluxos_de_caixa",
+        "variacao_patrimonio_pct": variacao_patrimonio,
+        "aviso": "Histórico reconstruído com posições atuais; não representa performance auditável.",
+    }
 
 
 @app.get("/api/proventos")
@@ -245,18 +264,18 @@ async def proventos(meses: int = Query(12, ge=1, le=24)):
         serialized.append({
             "ticker": r["ticker"],
             "data_pgto": d.isoformat() if hasattr(d, "isoformat") else str(d),
-            "valor": float(r["valor"] or 0),
+            "valor_por_cota": float(r["valor"] or 0),
+            "valor_recebido": None,
             "tipo": r["tipo"],
         })
 
-    # Totais
-    ano = sum(r["valor"] for r in serialized if r["data_pgto"] >= str(date.today().year))
-    mes_atual = sum(r["valor"] for r in serialized if r["data_pgto"][:7] == date.today().strftime("%Y-%m"))
-
     return {
         "proventos": serialized,
-        "total_ano": round(ano, 2),
-        "total_mes": round(mes_atual, 2),
+        "total_12m": None,
+        "total_ano": None,
+        "total_mes": None,
+        "status": "indisponiveis_sem_quantidade_na_data_com",
+        "unidade": "valor_por_cota",
     }
 
 
@@ -296,16 +315,9 @@ async def indicadores():
             "osc_12m": float(r["osc_12m"]) if r["osc_12m"] else None,
         }
 
-        # Bazin
-        dy = float(r["dividend_yield"] or 0)
-        item["bazin"] = round(dy / 6, 2) if dy > 0 else 0
-
-        # Graham
-        lpa = float(r["p_l"] or 0)
-        vpa = float(r["p_vp"] or 0)
-        lpa_val = (100 / lpa) if lpa > 0 else 0
-        vpa_val = (100 / vpa) if vpa > 0 else 0
-        item["graham"] = round(float(np.sqrt(22.5 * lpa_val * vpa_val)), 2) if (lpa_val > 0 and vpa_val > 0) else 0
+        # O schema ainda não fornece os insumos necessários para preços justos.
+        item["bazin"] = None
+        item["graham"] = None
 
         serialized.append(item)
 
@@ -317,9 +329,49 @@ async def indicadores():
     return {
         "indicadores": serialized,
         "data_coleta": ultima_coleta.isoformat() if hasattr(ultima_coleta, "isoformat") else str(ultima_coleta) if ultima_coleta else None,
+        "precos_justos_status": "indisponiveis_sem_lpa_vpa_e_dividendo_por_acao",
+    }
+
+
+@app.get("/api/qualidade")
+async def qualidade():
+    """Frescura, cobertura e limitações conhecidas da base exibida."""
+    with engine.connect() as conn:
+        resumo = _one(conn.execute(text("""
+            SELECT
+                (SELECT MAX(data) FROM investimentos.cotacoes),
+                (SELECT MAX(data_coleta) FROM investimentos.indicadores_fundamentalistas_v2),
+                (SELECT MAX(data) FROM investimentos.rentabilidade_diaria),
+                (SELECT COUNT(*) FROM investimentos.posicoes WHERE quantidade_total > 0),
+                (SELECT COUNT(*) FROM investimentos.posicoes p
+                 WHERE p.quantidade_total > 0 AND NOT EXISTS (
+                    SELECT 1 FROM investimentos.cotacoes c WHERE c.ticker = p.ticker
+                 )),
+                (SELECT COUNT(*) FROM investimentos.posicoes p
+                 LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
+                 WHERE p.quantidade_total > 0 AND a.ticker IS NULL)
+        """)).fetchall(), [
+            "ultima_cotacao", "ultimo_indicador", "ultimo_snapshot", "posicoes",
+            "posicoes_sem_cotacao", "posicoes_sem_cadastro",
+        ])
+
+    return {
+        **resumo,
+        "limitacoes": [
+            "Rentabilidade histórica reconstruída com as posições atuais.",
+            "TWR indisponível até incorporar aportes e retiradas ao cálculo.",
+            "Proventos recebidos indisponíveis; a base atual contém valores por cota.",
+            "Patrimônio e lucro consolidados indisponíveis enquanto houver posições sem cotação.",
+            "Bazin e Graham indisponíveis sem LPA, VPA e dividendos por ação.",
+        ],
     }
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="database unavailable") from exc
+    return {"status": "ok", "database": "connected"}

@@ -2,15 +2,15 @@ const API_BASE = "";
 
 // ── Colors ─────────────────────────────────────────────────────
 const COLORS = {
-    accent:  "#5EC8F8",
-    positive:"#4ADE80",
-    negative:"#EF5350",
-    warning: "#FFA726",
-    purple:  "#A78BFA",
-    text2:   "#8EA2BE",
-    text3:   "#546A84",
-    surface: "#0E1E30",
-    border:  "rgba(255,255,255,0.07)",
+    accent:  "#126B5B",
+    positive:"#147A4B",
+    negative:"#B44335",
+    warning: "#A66A16",
+    purple:  "#6C5A8C",
+    text2:   "#52635E",
+    text3:   "#7B8984",
+    surface: "#FBFAF6",
+    border:  "rgba(25,44,40,0.12)",
 };
 
 // ── Error handling ─────────────────────────────────────────────
@@ -27,6 +27,13 @@ function fmtBRL(v) { return v != null ? "R$ " + v.toLocaleString("pt-BR", {minim
 function fmtPct(v) { return v != null ? (v >= 0 ? "+" : "") + v.toFixed(2) + "%" : "—"; }
 function fmtPctPlain(v) { return v != null ? v.toFixed(2) + "%" : "—"; }
 function fmtInt(v) { return v != null ? v.toLocaleString("pt-BR") : "—"; }
+function fmtQty(v) { return v != null ? Number(v).toLocaleString("pt-BR", {maximumFractionDigits: 6}) : "—"; }
+function fmtDate(v) { return v ? new Date(v).toLocaleDateString("pt-BR") : "—"; }
+function safe(v) {
+    return String(v ?? "—").replace(/[&<>'"]/g, ch => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+    })[ch]);
+}
 
 // ── Chart defaults ──────────────────────────────────────────────
 Chart.defaults.color = COLORS.text2;
@@ -61,10 +68,36 @@ function carregarTab(tab) {
 
 // ── Início ──────────────────────────────────────────────────────
 async function carregarInicio() {
+    await carregarQualidade();
     await carregarStatus();
     await carregarEvolucao();
     await carregarDistribuicao();
     await carregarTop5();
+}
+
+async function carregarQualidade() {
+    try {
+        const res = await fetch(`${API_BASE}/api/qualidade`);
+        if (!res.ok) throw new Error(res.status);
+        const d = await res.json();
+        document.getElementById("quality-quote").textContent = d.ultima_cotacao || "Sem dados";
+        document.getElementById("quality-snapshot").textContent = d.ultimo_snapshot || "Sem dados";
+        document.getElementById("quality-coverage").textContent =
+            `${d.posicoes - d.posicoes_sem_cotacao}/${d.posicoes} posições com cotação`;
+        const badge = document.getElementById("quality-badge");
+        const healthy = d.posicoes > 0 && d.posicoes_sem_cotacao === 0 && d.posicoes_sem_cadastro === 0;
+        badge.textContent = healthy ? "Cobertura completa" : "Atenção necessária";
+        badge.className = `quality-badge ${healthy ? "quality-ok" : "quality-warning"}`;
+
+        const list = document.getElementById("quality-limitations");
+        list.replaceChildren(...d.limitacoes.map(item => {
+            const li = document.createElement("li");
+            li.textContent = item;
+            return li;
+        }));
+    } catch {
+        registrarErro("qualidade dos dados");
+    }
 }
 
 async function carregarStatus() {
@@ -73,20 +106,20 @@ async function carregarStatus() {
         if (!res.ok) throw new Error(res.status);
         const d = await res.json();
 
-        document.getElementById("kpi-patrimonio").textContent = fmtBRL(d.patrimonio);
+        document.getElementById("kpi-patrimonio").textContent = d.patrimonio == null ? "Cobertura incompleta" : fmtBRL(d.patrimonio);
         document.getElementById("kpi-patrimonio").classList.remove("skeleton");
-        document.getElementById("kpi-lucro").textContent = fmtBRL(d.lucro);
+        document.getElementById("kpi-lucro").textContent = d.lucro == null ? "Indisponivel" : fmtBRL(d.lucro);
         document.getElementById("kpi-lucro").classList.remove("skeleton");
-        document.getElementById("kpi-twr").textContent = fmtPct(d.twr_90d);
+        document.getElementById("kpi-twr").textContent = d.twr_90d == null ? "Indisponível" : fmtPct(d.twr_90d);
         document.getElementById("kpi-twr").classList.remove("skeleton");
-        document.getElementById("kpi-prov-ano").textContent = fmtBRL(d.proventos_ano);
+        document.getElementById("kpi-prov-ano").textContent = d.proventos_ano == null ? "Indisponivel" : fmtBRL(d.proventos_ano);
         document.getElementById("kpi-prov-ano").classList.remove("skeleton");
-        document.getElementById("kpi-prov-mes").textContent = fmtBRL(d.proventos_mes);
+        document.getElementById("kpi-prov-mes").textContent = d.proventos_mes == null ? "Indisponivel" : fmtBRL(d.proventos_mes);
         document.getElementById("kpi-prov-mes").classList.remove("skeleton");
 
         const rentEl = document.getElementById("kpi-rent");
-        rentEl.textContent = fmtPct(d.rentabilidade_pct);
-        rentEl.className = "kpi-delta " + (d.rentabilidade_pct >= 0 ? "positive" : "negative");
+        rentEl.textContent = d.rentabilidade_pct == null ? "Cobertura incompleta" : fmtPct(d.rentabilidade_pct);
+        rentEl.className = "kpi-delta " + (d.rentabilidade_pct == null ? "" : d.rentabilidade_pct >= 0 ? "positive" : "negative");
 
         document.getElementById("phase-label").textContent = "📊 Carteira";
     } catch {
@@ -182,8 +215,8 @@ async function carregarTop5() {
         const tbody = document.querySelector("#table-top5 tbody");
         tbody.innerHTML = top5.map(r => `
             <tr>
-                <td><strong>${r.ticker}</strong></td>
-                <td>${r.nome || "—"}</td>
+                <td><strong>${safe(r.ticker)}</strong></td>
+                <td>${safe(r.nome)}</td>
                 <td>${fmtBRL(r.preco_atual)}</td>
                 <td>${fmtBRL(r.saldo_atual)}</td>
                 <td class="${r.rentabilidade_pct >= 0 ? 'positive' : 'negative'}">${fmtPctPlain(r.rentabilidade_pct)}</td>
@@ -195,11 +228,15 @@ async function carregarTop5() {
 }
 
 // ── Posições ────────────────────────────────────────────────────
+let positionData = null;
+
 async function carregarPosicoes() {
     await carregarFiltros();
     await atualizarPosicoes();
-    document.getElementById("filtro-tipo").addEventListener("change", atualizarPosicoes);
-    document.getElementById("filtro-setor").addEventListener("change", atualizarPosicoes);
+    ["filtro-tipo", "filtro-setor", "filtro-status"].forEach(id =>
+        document.getElementById(id).addEventListener("change", renderPosicoes)
+    );
+    document.getElementById("filtro-busca").addEventListener("input", renderPosicoes);
 }
 
 async function carregarFiltros() {
@@ -215,40 +252,61 @@ async function carregarFiltros() {
 }
 
 async function atualizarPosicoes() {
+    try {
+        const res = await fetch(`${API_BASE}/api/posicoes`);
+        if (!res.ok) throw new Error(res.status);
+        positionData = await res.json();
+        document.getElementById("pos-count").textContent = positionData.quantidade_posicoes;
+        document.getElementById("pos-coverage").textContent = `${positionData.posicoes_com_cotacao} com cotacao`;
+        document.getElementById("pos-cost").textContent = fmtBRL(positionData.custo_total);
+        document.getElementById("pos-market").textContent = fmtBRL(positionData.total_carteira);
+        document.getElementById("pos-pending").textContent = positionData.posicoes_sem_cotacao;
+        const updates = positionData.posicoes.map(r => r.atualizado_em).filter(Boolean).sort();
+        document.getElementById("position-updated").textContent = updates.length ? fmtDate(updates.at(-1)) : "Sem data";
+        renderPosicoes();
+    } catch {
+        registrarErro("posicoes");
+    }
+}
+
+function renderPosicoes() {
+    if (!positionData) return;
     const tipo = document.getElementById("filtro-tipo").value;
     const setor = document.getElementById("filtro-setor").value;
-    const params = new URLSearchParams();
-    if (tipo !== "Todos") params.set("tipo", tipo);
-    if (setor !== "Todos") params.set("setor", setor);
+    const status = document.getElementById("filtro-status").value;
+    const busca = document.getElementById("filtro-busca").value.trim().toLocaleUpperCase("pt-BR");
 
-    try {
-        const res = await fetch(`${API_BASE}/api/posicoes?${params}`);
-        if (!res.ok) throw new Error(res.status);
-        const d = await res.json();
+    const rows = positionData.posicoes.filter(r => {
+        const matchesText = !busca || `${r.ticker} ${r.nome || ""}`.toLocaleUpperCase("pt-BR").includes(busca);
+        const matchesType = tipo === "Todos" || r.tipo === tipo;
+        const matchesSector = setor === "Todos" || r.setor === setor;
+        const matchesStatus = status === "todos" || (status === "ok" ? r.status === "ok" : r.status !== "ok");
+        return matchesText && matchesType && matchesSector && matchesStatus;
+    });
 
-        const tbody = document.querySelector("#table-posicoes tbody");
-        tbody.innerHTML = d.posicoes.map(r => `
-            <tr>
-                <td><strong>${r.ticker}</strong></td>
-                <td>${r.nome || "—"}</td>
-                <td>${r.tipo || "—"}</td>
-                <td>${r.setor || "—"}</td>
-                <td>${fmtInt(r.quantidade_total)}</td>
-                <td>${fmtBRL(r.preco_medio)}</td>
-                <td>${fmtBRL(r.preco_atual)}</td>
-                <td class="${r.var_dia_pct >= 0 ? 'positive' : 'negative'}">${fmtPctPlain(r.var_dia_pct)}</td>
-                <td class="${r.lucro_prejuizo >= 0 ? 'positive' : 'negative'}">${fmtBRL(r.lucro_prejuizo)}</td>
-                <td class="${r.rentabilidade_pct >= 0 ? 'positive' : 'negative'}">${fmtPctPlain(r.rentabilidade_pct)}</td>
-                <td>${fmtBRL(r.saldo_atual)}</td>
-                <td>${fmtPctPlain(r.pct_carteira)}</td>
-            </tr>
-        `).join("");
+    document.querySelector("#table-posicoes tbody").innerHTML = rows.map(r => {
+        const statusLabel = r.status === "ok" ? "Conferido" : r.status === "sem_cadastro" ? "Sem cadastro" : "Sem cotacao";
+        const resultClass = r.lucro_prejuizo == null ? "" : r.lucro_prejuizo >= 0 ? "positive" : "negative";
+        return `
+            <tr class="${r.status === "ok" ? "" : "row-pending"}">
+                <td><span class="status-chip status-${safe(r.status)}"><i></i>${statusLabel}</span></td>
+                <td><div class="asset-cell"><strong>${safe(r.ticker)}</strong><small>${safe(r.nome)}</small></div></td>
+                <td><span class="asset-type">${safe(r.tipo)}</span></td>
+                <td class="numeric">${fmtQty(r.quantidade_total)}</td>
+                <td class="numeric">${fmtBRL(r.preco_medio)}</td>
+                <td class="numeric">${fmtBRL(r.custo_total)}</td>
+                <td class="numeric"><strong>${fmtBRL(r.preco_atual)}</strong><small>${fmtDate(r.data_cotacao)}</small></td>
+                <td class="numeric">${fmtBRL(r.saldo_atual)}</td>
+                <td class="numeric ${resultClass}">${fmtBRL(r.lucro_prejuizo)}<small>${fmtPctPlain(r.rentabilidade_pct)}</small></td>
+                <td class="numeric">${fmtPctPlain(r.pct_carteira)}</td>
+                <td>${fmtDate(r.atualizado_em)}</td>
+            </tr>`;
+    }).join("");
 
-        document.getElementById("caption-posicoes").textContent =
-            `${d.posicoes.length} ativos | Saldo total: ${fmtBRL(d.total_saldo)}`;
-    } catch {
-        registrarErro("posições");
-    }
+    document.getElementById("position-result-count").textContent = `${rows.length} de ${positionData.quantidade_posicoes}`;
+    document.getElementById("caption-posicoes").textContent = positionData.cobertura_completa
+        ? "Cobertura completa para todas as posicoes exibidas."
+        : `${positionData.posicoes_sem_cotacao} posicoes permanecem sem valor de mercado; o total coberto nao e o patrimonio completo.`;
 }
 
 // ── Proventos ───────────────────────────────────────────────────
@@ -266,11 +324,11 @@ async function atualizarProventos() {
         const d = await res.json();
 
         // KPIs
-        document.getElementById("prov-12m").textContent = fmtBRL(d.total_ano);
+        document.getElementById("prov-12m").textContent = d.total_12m == null ? "Indisponivel" : fmtBRL(d.total_12m);
         document.getElementById("prov-12m").classList.remove("skeleton");
-        document.getElementById("prov-ano").textContent = fmtBRL(d.total_ano);
+        document.getElementById("prov-ano").textContent = d.total_ano == null ? "Indisponivel" : fmtBRL(d.total_ano);
         document.getElementById("prov-ano").classList.remove("skeleton");
-        document.getElementById("prov-mes").textContent = fmtBRL(d.total_mes);
+        document.getElementById("prov-mes").textContent = d.total_mes == null ? "Indisponivel" : fmtBRL(d.total_mes);
         document.getElementById("prov-mes").classList.remove("skeleton");
 
         // Chart
@@ -280,7 +338,7 @@ async function atualizarProventos() {
         if (meses == 1) {
             document.getElementById("prov-chart-title").textContent = "📊 Proventos por Ativo (último mês)";
             const byTicker = {};
-            d.proventos.forEach(p => { byTicker[p.ticker] = (byTicker[p.ticker] || 0) + p.valor; });
+            d.proventos.forEach(p => { byTicker[p.ticker] = (byTicker[p.ticker] || 0) + p.valor_por_cota; });
             const sorted = Object.entries(byTicker).sort((a, b) => a[1] - b[1]);
             chartProventos = new Chart(ctx, {
                 type: "bar",
@@ -301,7 +359,7 @@ async function atualizarProventos() {
             const byMonth = {};
             d.proventos.forEach(p => {
                 const ym = p.data_pgto.slice(0, 7);
-                byMonth[ym] = (byMonth[ym] || 0) + p.valor;
+                byMonth[ym] = (byMonth[ym] || 0) + p.valor_por_cota;
             });
             const sorted = Object.entries(byMonth).sort((a, b) => a[0].localeCompare(b[0]));
             chartProventos = new Chart(ctx, {
@@ -323,10 +381,10 @@ async function atualizarProventos() {
         const tbody = document.querySelector("#table-proventos tbody");
         tbody.innerHTML = d.proventos.map(p => `
             <tr>
-                <td><strong>${p.ticker}</strong></td>
+                <td><strong>${safe(p.ticker)}</strong></td>
                 <td>${new Date(p.data_pgto).toLocaleDateString("pt-BR")}</td>
-                <td>${fmtBRL(p.valor)}</td>
-                <td>${p.tipo || "—"}</td>
+                <td>${fmtBRL(p.valor_por_cota)}</td>
+                <td>${safe(p.tipo)}</td>
             </tr>
         `).join("");
     } catch {
@@ -351,7 +409,7 @@ async function atualizarRentabilidade() {
         if (!h.length) return;
 
         // KPIs
-        document.getElementById("rent-twr").textContent = fmtPct(d.twr);
+        document.getElementById("rent-twr").textContent = fmtPct(d.variacao_patrimonio_pct);
         document.getElementById("rent-twr").classList.remove("skeleton");
         const ultimo = h[h.length - 1];
         document.getElementById("rent-dia").textContent = fmtPct(ultimo.rentabilidade);
@@ -427,7 +485,7 @@ async function carregarAnalise() {
         const tbodyInd = document.querySelector("#table-indicadores tbody");
         tbodyInd.innerHTML = ind.map(r => `
             <tr>
-                <td><strong>${r.ticker}</strong></td>
+                <td><strong>${safe(r.ticker)}</strong></td>
                 <td>${r.p_l != null ? r.p_l.toFixed(2) : "—"}</td>
                 <td>${r.p_vp != null ? r.p_vp.toFixed(2) : "—"}</td>
                 <td>${r.roe != null ? r.roe.toFixed(1) + "%" : "—"}</td>
@@ -504,7 +562,7 @@ async function carregarAnalise() {
         const tbodyBg = document.querySelector("#table-bazin-graham tbody");
         tbodyBg.innerHTML = ind.map(r => `
             <tr>
-                <td><strong>${r.ticker}</strong></td>
+                <td><strong>${safe(r.ticker)}</strong></td>
                 <td>${r.bazin > 0 ? "R$ " + r.bazin.toFixed(2) : "—"}</td>
                 <td>${r.graham > 0 ? "R$ " + r.graham.toFixed(2) : "—"}</td>
             </tr>
@@ -516,5 +574,5 @@ async function carregarAnalise() {
 }
 
 // ── Init ────────────────────────────────────────────────────────
-carregarInicio();
-tabsLoaded.inicio = true;
+carregarPosicoes();
+tabsLoaded.posicoes = true;

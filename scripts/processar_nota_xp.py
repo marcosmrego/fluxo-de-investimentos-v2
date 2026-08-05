@@ -35,36 +35,15 @@ API_PARSER_URL = "https://parserxp.expansao-ai.com.br/parse/xp-note"
 
 from db_utils import DB_CONFIG
 
-CRED_FILE = Path("/home/hermes/.hermes/.env")
 
 
 def _get_db_password() -> str:
     """Extrai a senha do banco do arquivo .env ou do script analise_acoes_diaria.py."""
-    import re
-
-    # 1. Tenta do .env
-    if CRED_FILE.exists():
-        content = CRED_FILE.read_text()
-        for key in ("DB_PASSWORD", "POSTGRES_PASSWORD", "PGPASSWORD"):
-            pattern = rf"^{key}=(.+)$"
-            m = re.search(pattern, content, re.MULTILINE)
-            if m:
-                return m.group(1).strip().strip('"').strip("'")
-
-    # 2. Fallback: extrai do script analise_acoes_diaria.py
-    script_path = Path("/home/hermes/.hermes/workspace/analise_acoes_diaria.py")
-    if script_path.exists():
-        content = script_path.read_text()
-        m = re.search(r'"password":\s*"([^"]+)"', content)
-        if m:
-            return m.group(1)
-
     raise ValueError("Senha do banco não encontrada")
 
 
 # ─── RESOLVEDOR DE TICKERS ─────────────────────────────────────────────────
 
-XP_NOTAS_SENHA = "822"
 
 def _carregar_mapeamento_ativos(conn) -> dict:
     """
@@ -225,9 +204,9 @@ def _consolidate_ops(operacoes: list) -> list:
 
 def conectar():
     """Conecta ao banco Postgres."""
-    pw = _get_db_password()
-    config = {**DB_CONFIG, "password": pw}
-    conn = psycopg2.connect(**config)
+    if not DB_CONFIG.get("password"):
+        raise ValueError("DB_PASSWORD nao esta definida no .env ou no vault")
+    conn = psycopg2.connect(**DB_CONFIG)
     conn.autocommit = False
     return conn
 

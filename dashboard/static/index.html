@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Carteira Prof. Marcos — Dashboard de Investimentos</title>
-    <meta name="description" content="Dashboard de investimentos — acompanhamento em tempo real da carteira.">
+    <title>Norte — Carteira de Investimentos</title>
+    <meta name="description" content="Posicao consolidada e qualidade dos dados da carteira.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
@@ -18,10 +18,10 @@
 <header>
     <div class="header-inner">
         <div class="header-brand">
-            <span class="brand-icon">📊</span>
+            <span class="brand-mark">N</span>
             <div>
-                <h1>Carteira Prof. Marcos</h1>
-                <p class="brand-sub">Dashboard de investimentos · tempo real</p>
+                <h1>Norte</h1>
+                <p class="brand-sub">Carteira de investimentos</p>
             </div>
         </div>
         <div class="header-right">
@@ -37,21 +37,40 @@
     <div id="erro" class="error-bar hidden"></div>
 
     <nav class="tabs-nav" role="tablist">
-        <button class="tab-btn active" data-tab="inicio" role="tab">🏠 Início</button>
-        <button class="tab-btn" data-tab="posicoes" role="tab">📑 Posições</button>
-        <button class="tab-btn" data-tab="proventos" role="tab">💵 Proventos</button>
-        <button class="tab-btn" data-tab="rentabilidade" role="tab">📈 Rentabilidade</button>
-        <button class="tab-btn" data-tab="analise" role="tab">🔬 Análise</button>
+        <button class="tab-btn" data-tab="inicio" role="tab">Visao geral</button>
+        <button class="tab-btn active" data-tab="posicoes" role="tab">Posicao atual</button>
+        <button class="tab-btn" data-tab="proventos" role="tab">Eventos</button>
+        <button class="tab-btn" data-tab="rentabilidade" role="tab">Historico</button>
+        <button class="tab-btn" data-tab="analise" role="tab">Fundamentos</button>
     </nav>
 
     <!-- ── Tab: Início ──────────────────────────────── -->
-    <div class="tab-panel active" id="tab-inicio">
+    <div class="tab-panel" id="tab-inicio">
+
+        <section class="card quality-card">
+            <div class="quality-header">
+                <div>
+                    <p class="eyebrow">CONFIANÇA DOS DADOS</p>
+                    <h2>O que sustenta estes números</h2>
+                </div>
+                <span class="quality-badge" id="quality-badge">Verificando...</span>
+            </div>
+            <div class="quality-grid">
+                <div><span>Última cotação</span><strong id="quality-quote">—</strong></div>
+                <div><span>Último snapshot</span><strong id="quality-snapshot">—</strong></div>
+                <div><span>Cobertura</span><strong id="quality-coverage">—</strong></div>
+            </div>
+            <details>
+                <summary>Limitações conhecidas</summary>
+                <ul id="quality-limitations"></ul>
+            </details>
+        </section>
 
         <!-- KPIs -->
         <div class="kpi-grid" id="kpi-grid">
             <div class="kpi-card"><div class="kpi-label">💰 Patrimônio</div><div class="kpi-value skeleton" id="kpi-patrimonio">—</div></div>
             <div class="kpi-card"><div class="kpi-label">📈 Lucro</div><div class="kpi-value skeleton" id="kpi-lucro">—</div><div class="kpi-delta" id="kpi-rent"></div></div>
-            <div class="kpi-card"><div class="kpi-label">🔄 TWR 90d</div><div class="kpi-value skeleton" id="kpi-twr">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">TWR auditável</div><div class="kpi-value skeleton" id="kpi-twr">—</div></div>
             <div class="kpi-card"><div class="kpi-label">💵 Prov. Ano</div><div class="kpi-value skeleton" id="kpi-prov-ano">—</div></div>
             <div class="kpi-card"><div class="kpi-label">📅 Prov. Mês</div><div class="kpi-value skeleton" id="kpi-prov-mes">—</div></div>
         </div>
@@ -76,13 +95,33 @@
     </div>
 
     <!-- ── Tab: Posições ────────────────────────────── -->
-    <div class="tab-panel" id="tab-posicoes">
-        <div class="filtros">
-            <label>Tipo: <select id="filtro-tipo"><option>Todos</option></select></label>
-            <label>Setor: <select id="filtro-setor"><option>Todos</option></select></label>
+    <div class="tab-panel active" id="tab-posicoes">
+        <section class="position-hero">
+            <div>
+                <p class="eyebrow">POSICAO CONSOLIDADA</p>
+                <h2>O que existe na carteira hoje</h2>
+                <p class="hero-copy">Conferencia de quantidade, custo e cobertura. Itens sem cadastro ou cotacao continuam visiveis.</p>
+            </div>
+            <div class="as-of"><span>Base atualizada</span><strong id="position-updated">—</strong></div>
+        </section>
+
+        <div class="position-summary">
+            <article><span>Posicoes</span><strong id="pos-count">—</strong><small id="pos-coverage">—</small></article>
+            <article><span>Custo registrado</span><strong id="pos-cost">—</strong><small>valor contabil da base</small></article>
+            <article><span>Valor coberto</span><strong id="pos-market">—</strong><small>somente itens cotados</small></article>
+            <article class="attention-card"><span>Pendencias</span><strong id="pos-pending">—</strong><small>cadastro ou cotacao</small></article>
         </div>
-        <section class="card">
-            <div class="table-wrap"><table id="table-posicoes"><thead><tr><th>Ativo</th><th>Nome</th><th>Tipo</th><th>Setor</th><th>Qtd</th><th>Preço Médio</th><th>Preço Atual</th><th>Var. Dia</th><th>Lucro</th><th>Rent.</th><th>Saldo</th><th>% Cart.</th></tr></thead><tbody></tbody></table></div>
+
+        <div class="position-toolbar">
+            <label class="search-field"><span>Buscar</span><input id="filtro-busca" type="search" placeholder="Ticker ou nome"></label>
+            <label><span>Classe</span><select id="filtro-tipo"><option>Todos</option></select></label>
+            <label><span>Setor</span><select id="filtro-setor"><option>Todos</option></select></label>
+            <label><span>Status</span><select id="filtro-status"><option value="todos">Todos</option><option value="ok">Conferido</option><option value="pendente">Com pendencia</option></select></label>
+        </div>
+
+        <section class="card position-card">
+            <div class="section-heading"><div><p class="eyebrow">INVENTARIO</p><h2>Ativos e quantidades</h2></div><span id="position-result-count">—</span></div>
+            <div class="table-wrap"><table id="table-posicoes"><thead><tr><th>Status</th><th>Ativo</th><th>Classe</th><th>Quantidade</th><th>Preco medio</th><th>Custo</th><th>Preco atual</th><th>Valor coberto</th><th>Resultado</th><th>Peso</th><th>Atualizacao</th></tr></thead><tbody></tbody></table></div>
             <p class="caption" id="caption-posicoes"></p>
         </section>
     </div>
@@ -110,7 +149,8 @@
         </section>
         <section class="card">
             <h2>📋 Histórico</h2>
-            <div class="table-wrap"><table id="table-proventos"><thead><tr><th>Ativo</th><th>Data Pgto</th><th>Valor</th><th>Tipo</th></tr></thead><tbody></tbody></table></div>
+            <div class="table-wrap"><table id="table-proventos"><thead><tr><th>Ativo</th><th>Data Pgto</th><th>Valor por cota</th><th>Tipo</th></tr></thead><tbody></tbody></table></div>
+            <p class="caption">Valores recebidos indisponiveis ate existir posicao historica na data-com.</p>
         </section>
     </div>
 
@@ -127,7 +167,7 @@
             </label>
         </div>
         <div class="kpi-grid kpi-grid-3">
-            <div class="kpi-card"><div class="kpi-label">TWR</div><div class="kpi-value skeleton" id="rent-twr">—</div></div>
+            <div class="kpi-card"><div class="kpi-label">Variação do patrimônio</div><div class="kpi-value skeleton" id="rent-twr">—</div></div>
             <div class="kpi-card"><div class="kpi-label">Último Dia</div><div class="kpi-value skeleton" id="rent-dia">—</div></div>
             <div class="kpi-card"><div class="kpi-label">Lucro/Prejuízo</div><div class="kpi-value skeleton" id="rent-lucro">—</div></div>
         </div>
@@ -159,9 +199,9 @@
             </section>
         </div>
         <section class="card">
-            <h2>💎 Preço-Teto (Bazin) & Preço Justo (Graham)</h2>
+            <h2>Preço-teto: aguardando dados suficientes</h2>
             <div class="table-wrap"><table id="table-bazin-graham"><thead><tr><th>Ativo</th><th>Bazin (R$)</th><th>Graham (R$)</th></tr></thead><tbody></tbody></table></div>
-            <p class="caption">Bazin: Preço máximo (yield 6%). Graham: √(22.5 × LPA × VPA). Estimativas simplificadas.</p>
+            <p class="caption">O sistema não calcula Bazin ou Graham enquanto LPA, VPA e dividendos por ação não estiverem disponíveis. Assim, não apresenta estimativas artificiais como preços reais.</p>
         </section>
     </div>
 </main>

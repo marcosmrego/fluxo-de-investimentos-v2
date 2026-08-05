@@ -34,6 +34,7 @@ from reportlab.lib.units import mm, inch
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_utils import DB_CONFIG
+from data_availability import unavailable_passive_income_result
 
 COR = {
     "bg": "#FAFBFC",
@@ -100,6 +101,10 @@ def compute_renda_passiva() -> dict:
                         tickers_com_proventos, total_registros },
         }
     """
+    # Os eventos armazenam valor por cota. Sem a quantidade historica na
+    # data-com, multiplicar pela posicao atual fabrica recebimentos passados.
+    return unavailable_passive_income_result()
+
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
 
@@ -543,6 +548,15 @@ def renda_passiva_para_pdf(data: dict, graficos_paths: dict = None) -> list:
     )
 
     story = []
+
+    if not data.get("disponivel", True):
+        story.append(Paragraph("Renda Passiva", h1))
+        story.append(Paragraph(data["motivo"], body))
+        story.append(Paragraph(
+            "Nenhum total recebido, yield on cost ou projecao foi calculado.",
+            muted,
+        ))
+        return story
     resumo = data["resumo"]
     proventos_por_ativo = data["proventos_por_ativo"]
 
@@ -671,6 +685,9 @@ def resumo_renda_passiva_telegram(data: dict) -> str:
     Returns:
         str: texto formatado para Telegram
     """
+    if not data.get("disponivel", True):
+        return "Renda passiva indisponivel: falta posicao historica na data-com."
+
     resumo = data["resumo"]
 
     linha1 = (

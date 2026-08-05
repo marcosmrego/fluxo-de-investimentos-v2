@@ -946,15 +946,16 @@ def main():
     print("  ✓ Setorial - Tijolo vs Papel")
     
     # Graficos renda passiva
-    path_evol_prov = os.path.join(TMPDIR, "evolucao_proventos.png")
-    modulo_renda_passiva.grafico_evolucao_proventos(data["renda_passiva"]["proventos_por_mes"], path_evol_prov)
-    graficos["evolucao_proventos"] = path_evol_prov
-    print("  ✓ Renda Passiva - Evolucao")
-    
-    path_yoc = os.path.join(TMPDIR, "yield_on_cost.png")
-    modulo_renda_passiva.grafico_yield_on_cost(data["renda_passiva"]["proventos_por_ativo"], path_yoc)
-    graficos["yield_on_cost"] = path_yoc
-    print("  ✓ Renda Passiva - Yield on Cost")
+    if data["renda_passiva"].get("disponivel", True):
+        path_evol_prov = os.path.join(TMPDIR, "evolucao_proventos.png")
+        modulo_renda_passiva.grafico_evolucao_proventos(data["renda_passiva"]["proventos_por_mes"], path_evol_prov)
+        graficos["evolucao_proventos"] = path_evol_prov
+        print("  Renda Passiva - Evolucao")
+
+        path_yoc = os.path.join(TMPDIR, "yield_on_cost.png")
+        modulo_renda_passiva.grafico_yield_on_cost(data["renda_passiva"]["proventos_por_ativo"], path_yoc)
+        graficos["yield_on_cost"] = path_yoc
+        print("  Renda Passiva - Yield on Cost")
     
     # Graficos benchmarking
     path_bench = os.path.join(TMPDIR, "benchmarking.png")

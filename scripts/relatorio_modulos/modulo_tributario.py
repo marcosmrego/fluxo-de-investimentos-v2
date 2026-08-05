@@ -28,6 +28,7 @@ from reportlab.lib.units import mm
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db_utils import DB_CONFIG
+from data_availability import unavailable_tax_result
 
 COR = {
     "bg": "#FAFBFC",
@@ -113,6 +114,11 @@ def compute_situacao_tributaria() -> dict:
             },
         }
     """
+    # A base atual guarda posicoes, mas nao um livro fiscal mensal com
+    # alienacoes, custos, taxas e prejuizos realizados por regime. Retornar
+    # numeros de IR a partir de ganhos nao realizados seria enganoso.
+    return unavailable_tax_result()
+
     conn = psycopg2.connect(**DB_CONFIG)
     cur = conn.cursor()
 
@@ -341,6 +347,16 @@ def tributario_para_pdf(trib_data: dict, styles: dict = None) -> list:
     S = default_styles  # alias para conveniencia
     story = []
 
+    if not trib_data.get("disponivel", True):
+        story.append(Paragraph("Situacao Tributaria", S["h1"]))
+        story.append(Paragraph(trib_data["motivo"], S["body"]))
+        story.append(Paragraph(
+            "Nenhum valor de IR devido, prejuizo compensavel ou economia fiscal "
+            "foi estimado.",
+            S["muted"],
+        ))
+        return story
+
     # --- Cabecalho da secao ---
     story.append(Paragraph("Situacao Tributaria", S["h1"]))
     story.append(Paragraph(
@@ -502,6 +518,9 @@ def resumo_tributario_telegram(trib_data: dict) -> str:
     Returns:
         String formatada para Telegram.
     """
+    if not trib_data.get("disponivel", True):
+        return "Situacao tributaria indisponivel: falta livro fiscal de operacoes realizadas."
+
     resumo = trib_data["resumo"]
     acoes = trib_data["acoes"]
     fiis = trib_data["fiis"]
@@ -535,6 +554,9 @@ if __name__ == "__main__":
     # 1. Computar dados
     print("\n[1] Consultando banco de dados...")
     trib = compute_situacao_tributaria()
+    if not trib.get("disponivel", True):
+        print(trib["motivo"])
+        raise SystemExit(0)
 
     # 2. Exibir resumo detalhado
     print("\n[2] Resumo:")
