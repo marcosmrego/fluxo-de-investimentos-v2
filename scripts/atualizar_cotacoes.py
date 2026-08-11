@@ -2,6 +2,7 @@
 """Atualiza cotações de todos os ativos com posição aberta."""
 
 import json
+import argparse
 import time
 import urllib.request
 from datetime import datetime, timezone
@@ -121,13 +122,45 @@ def atualizar(conn) -> tuple[int, list[str]]:
     return total, failures
 
 
+def auditar(conn) -> tuple[int, int, int, object]:
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            COUNT(DISTINCT p.ticker),
+            COUNT(DISTINCT a.ticker),
+            COUNT(DISTINCT c.ticker),
+            MAX(c.data)
+        FROM investimentos.posicoes p
+        LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
+        LEFT JOIN investimentos.cotacoes c
+          ON c.ticker = p.ticker
+         AND c.data >= CURRENT_DATE - INTERVAL '7 days'
+        WHERE p.quantidade_total > 0
+    """)
+    result = cursor.fetchone()
+    cursor.close()
+    return result
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--audit-only", action="store_true")
+    args = parser.parse_args()
     conn = psycopg2.connect(**DB_CONFIG)
     try:
-        total, failures = atualizar(conn)
+        total, failures = (0, []) if args.audit_only else atualizar(conn)
+        positions, registered, quoted, latest = auditar(conn)
     finally:
         conn.close()
-    print(f"Cotações gravadas/atualizadas: {total}")
+    if not args.audit_only:
+        print(f"Cotações gravadas/atualizadas: {total}")
+    print(
+        f"Cobertura: posições={positions}, cadastrados={registered}, "
+        f"cotados_7d={quoted}, data_mais_recente={latest}"
+    )
+    if registered != positions or quoted != positions:
+        print("Cobertura incompleta da carteira")
+        return 1
     if failures:
         print("Tickers sem atualização: " + ", ".join(failures))
         return 1
