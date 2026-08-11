@@ -18,7 +18,14 @@ consolidá-los em BRL, para que o patrimônio não some dólares como reais.
 
 - RED: 4 falhas — assinatura sem moeda, conversor ausente e migração ausente.
 - GREEN relevante: `python -m pytest tests/test_atualizar_cotacoes.py tests/test_currency_schema.py -q` — 6 aprovados.
-- A suíte completa será registrada no fechamento desta execução.
+- GREEN completo: `python -m pytest -q` — 31 aprovados.
+
+## Validação de produção
+
+- Migração aplicada de forma transacional.
+- Realty Income cadastrado em USD com quantidade `0,10845`.
+- Coleta real: 792 cotações, 36/36 posições monitoradas cobertas.
+- Câmbio USD/BRL preservado junto à cotação e valores consolidados em BRL.
 
 ## Limite conhecido
 
