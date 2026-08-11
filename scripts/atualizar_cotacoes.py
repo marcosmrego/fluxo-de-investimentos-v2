@@ -10,6 +10,7 @@ import psycopg2
 from psycopg2.extras import execute_values
 
 from db_utils import DB_CONFIG
+from processar_nota_xp import garantir_cadastros_ativos
 
 
 PORTFOLIO_SQL = """
@@ -67,6 +68,20 @@ def parse_chart(ticker: str, payload: dict) -> list[tuple]:
 
 def atualizar(conn) -> tuple[int, list[str]]:
     cursor = conn.cursor()
+    cursor.execute("""
+        SELECT DISTINCT p.ticker
+        FROM investimentos.posicoes p
+        LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
+        WHERE p.quantidade_total > 0 AND a.ticker IS NULL
+        ORDER BY p.ticker
+    """)
+    orfaos = [row[0] for row in cursor.fetchall()]
+    if orfaos:
+        garantir_cadastros_ativos(
+            conn, [{"ticker": ticker} for ticker in orfaos]
+        )
+        conn.commit()
+
     cursor.execute(PORTFOLIO_SQL)
     tickers = [row[0] for row in cursor.fetchall()]
     if not tickers:
