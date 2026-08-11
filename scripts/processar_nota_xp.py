@@ -32,6 +32,20 @@ from db_utils import DB_CONFIG
 from xp_note_parser import parse_xp_pdf
 
 
+# Exact descriptions verified against official B3 instruments. Keep this map
+# deliberately small: unknown instruments must stop for review, never guess.
+DESCRICOES_B3_VERIFICADAS = {
+    "SPACE X DRN": "SPCX34",
+    "NU HOLDINGS DRN": "ROXO34",
+    "BTG S&P 500 CI": "SPXB11",
+}
+
+
+def ticker_oficial_por_descricao(description: str) -> Optional[str]:
+    normalized = " ".join((description or "").upper().split())
+    return DESCRICOES_B3_VERIFICADAS.get(normalized)
+
+
 
 def _get_db_password() -> str:
     """Extrai a senha do banco do arquivo .env ou do script analise_acoes_diaria.py."""
@@ -88,6 +102,12 @@ def resolver_tickers(operacoes: list, conn) -> list:
 
         desc = (op.get("descricao_ativo") or "").upper().strip()
         if not desc:
+            continue
+
+        verified_ticker = ticker_oficial_por_descricao(desc)
+        if verified_ticker:
+            op["ticker"] = verified_ticker
+            resolvidos += 1
             continue
 
         primeira = desc.split()[0] if desc.split() else ""

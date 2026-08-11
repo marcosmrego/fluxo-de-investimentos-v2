@@ -143,6 +143,20 @@ def test_unresolved_ticker_blocks_database_write():
         )
 
 
+@pytest.mark.parametrize(
+    "description,ticker",
+    [
+        ("SPACE X DRN", "SPCX34"),
+        ("NU HOLDINGS DRN", "ROXO34"),
+        ("BTG S&P 500 CI", "SPXB11"),
+    ],
+)
+def test_resolves_verified_b3_descriptions(description, ticker):
+    import processar_nota_xp
+
+    assert processar_nota_xp.ticker_oficial_por_descricao(description) == ticker
+
+
 def test_duplicate_note_is_considered_handled_by_gmail_importer(monkeypatch, tmp_path):
     import buscar_notas_gmail
 
