@@ -153,9 +153,12 @@ async def posicoes(
     with engine.connect() as conn:
         rows = _df(conn.execute(text("""
             SELECT
-                p.ticker, a.nome, a.tipo, a.setor,
+                p.ticker, a.nome, a.tipo, a.setor, a.moeda,
                 p.quantidade_total, p.preco_medio, p.custo_total,
                 c.fechamento AS preco_atual,
+                p.preco_medio_origem, p.custo_total_origem,
+                c.fechamento_origem AS preco_atual_origem,
+                c.taxa_cambio,
                 ROUND((c.fechamento - p.preco_medio) * p.quantidade_total, 2) AS lucro_prejuizo,
                 ROUND(((c.fechamento - p.preco_medio) / p.preco_medio) * 100, 2) AS rentabilidade_pct,
                 ROUND(c.fechamento * p.quantidade_total, 2) AS saldo_atual,
@@ -167,14 +170,17 @@ async def posicoes(
             FROM investimentos.posicoes p
             LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
             LEFT JOIN LATERAL (
-                SELECT fechamento, variacao_pct, data FROM investimentos.cotacoes
+                SELECT fechamento, fechamento_origem, taxa_cambio,
+                       variacao_pct, data FROM investimentos.cotacoes
                 WHERE ticker = p.ticker ORDER BY data DESC LIMIT 1
             ) c ON true
             ORDER BY saldo_atual DESC NULLS LAST
         """)).fetchall(),
-            ["ticker", "nome", "tipo", "setor",
+            ["ticker", "nome", "tipo", "setor", "moeda",
              "quantidade_total", "preco_medio", "custo_total",
-             "preco_atual", "lucro_prejuizo", "rentabilidade_pct",
+             "preco_atual", "preco_medio_origem", "custo_total_origem",
+             "preco_atual_origem", "taxa_cambio",
+             "lucro_prejuizo", "rentabilidade_pct",
              "saldo_atual", "var_dia_pct", "data_cotacao", "atualizado_em",
              "cadastrado", "possui_cotacao"])
 

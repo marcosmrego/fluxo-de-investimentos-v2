@@ -15,18 +15,15 @@ from processar_nota_xp import garantir_cadastros_ativos
 
 
 PORTFOLIO_SQL = """
-    SELECT DISTINCT p.ticker
+    SELECT DISTINCT p.ticker, a.moeda
     FROM investimentos.posicoes p
     JOIN investimentos.ativos a ON a.ticker = p.ticker
     WHERE p.quantidade_total > 0 AND a.monitorar = TRUE
     ORDER BY p.ticker
 """
 
-INTERNATIONAL_TICKERS = {"QQQ", "SPHD"}
-
-
-def yahoo_symbol(ticker: str) -> str:
-    return ticker if ticker in INTERNATIONAL_TICKERS else f"{ticker}.SA"
+def yahoo_symbol(ticker: str, moeda: str = "BRL") -> str:
+    return ticker if moeda == "USD" else f"{ticker}.SA"
 
 
 def fetch_chart(symbol: str, range_days: str = "1mo") -> dict:
@@ -67,6 +64,36 @@ def parse_chart(ticker: str, payload: dict) -> list[tuple]:
     return rows
 
 
+def normalizar_para_brl(
+    rows: list[tuple], moeda: str, cambio_por_data: dict
+) -> list[tuple]:
+    """Converte OHLC para BRL, preservando fechamento e moeda de origem."""
+    normalized = []
+    previous_close_brl = None
+    available_dates = sorted(cambio_por_data)
+    for row in rows:
+        ticker, quote_date, opening, high, low, close, volume, _, source = row
+        rate = 1.0
+        if moeda != "BRL":
+            eligible = [day for day in available_dates if day <= quote_date]
+            if not eligible:
+                raise ValueError(f"sem câmbio {moeda}/BRL para {quote_date}")
+            rate = cambio_por_data[eligible[-1]]
+        converted = tuple(
+            round(value * rate, 6) if value is not None else None
+            for value in (opening, high, low, close)
+        )
+        variation = None
+        if previous_close_brl not in (None, 0):
+            variation = round((converted[3] / previous_close_brl - 1) * 100, 4)
+        normalized.append((
+            ticker, quote_date, *converted, volume, variation, source,
+            moeda, close, rate,
+        ))
+        previous_close_brl = converted[3]
+    return normalized
+
+
 def atualizar(conn) -> tuple[int, list[str]]:
     cursor = conn.cursor()
     cursor.execute("""
@@ -84,21 +111,33 @@ def atualizar(conn) -> tuple[int, list[str]]:
         conn.commit()
 
     cursor.execute(PORTFOLIO_SQL)
-    tickers = [row[0] for row in cursor.fetchall()]
-    if not tickers:
+    assets = cursor.fetchall()
+    if not assets:
         raise RuntimeError("nenhum ativo monitorado com posição aberta")
+
+    currencies = {currency for _, currency in assets}
+    fx_by_currency = {"BRL": {}}
+    if "USD" in currencies:
+        fx_rows = parse_chart("USDBRL", fetch_chart("BRL=X"))
+        fx_by_currency["USD"] = {row[1]: row[5] for row in fx_rows}
 
     total = 0
     failures = []
-    for ticker in tickers:
+    for ticker, currency in assets:
         try:
-            rows = parse_chart(ticker, fetch_chart(yahoo_symbol(ticker)))
+            native_rows = parse_chart(
+                ticker, fetch_chart(yahoo_symbol(ticker, currency))
+            )
+            rows = normalizar_para_brl(
+                native_rows, currency, fx_by_currency[currency]
+            )
             if not rows:
                 raise RuntimeError("fonte retornou série vazia")
             execute_values(cursor, """
                 INSERT INTO investimentos.cotacoes
                     (ticker, data, abertura, maxima, minima, fechamento,
-                     volume, variacao_pct, fonte)
+                     volume, variacao_pct, fonte, moeda,
+                     fechamento_origem, taxa_cambio)
                 VALUES %s
                 ON CONFLICT (ticker, data) DO UPDATE SET
                     abertura = EXCLUDED.abertura,
@@ -107,7 +146,10 @@ def atualizar(conn) -> tuple[int, list[str]]:
                     fechamento = EXCLUDED.fechamento,
                     volume = EXCLUDED.volume,
                     variacao_pct = EXCLUDED.variacao_pct,
-                    fonte = EXCLUDED.fonte
+                    fonte = EXCLUDED.fonte,
+                    moeda = EXCLUDED.moeda,
+                    fechamento_origem = EXCLUDED.fechamento_origem,
+                    taxa_cambio = EXCLUDED.taxa_cambio
             """, rows, page_size=100)
             conn.commit()
             total += len(rows)

@@ -11,7 +11,7 @@ import atualizar_cotacoes
 def test_yahoo_symbol_uses_b3_suffix():
     assert atualizar_cotacoes.yahoo_symbol("SPCX34") == "SPCX34.SA"
     assert atualizar_cotacoes.yahoo_symbol("ROXO34") == "ROXO34.SA"
-    assert atualizar_cotacoes.yahoo_symbol("QQQ") == "QQQ"
+    assert atualizar_cotacoes.yahoo_symbol("QQQ", "USD") == "QQQ"
     assert atualizar_cotacoes.yahoo_symbol("O", "USD") == "O"
 
 
