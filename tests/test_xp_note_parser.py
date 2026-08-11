@@ -122,6 +122,7 @@ def test_gmail_importer_has_no_hardcoded_note_password():
     )
     assert 'XP_SENHA = "822"' not in source
     assert 'os.environ.get("XP_NOTAS_PASSWORD")' in source
+    assert "load_dotenv" in source
 
 
 def test_unresolved_ticker_blocks_database_write():

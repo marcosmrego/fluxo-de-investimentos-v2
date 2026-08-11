@@ -27,13 +27,17 @@ from pathlib import Path
 from typing import Optional
 
 import psycopg2
+from dotenv import load_dotenv
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────
+
+PROJECT_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_DIR / ".env")
 
 GMAIL_TOKEN = Path("/home/hermes/.hermes/google_token_notas.json")
 GMAIL_SECRET = Path("/home/hermes/.hermes/google_client_secret_notas.json")
 DOWNLOAD_DIR = Path("/tmp/notas_xp")
-PROCESSOR_SCRIPT = Path("/opt/data/fluxo-de-investimentos-v2/scripts/processar_nota_xp.py")
+PROCESSOR_SCRIPT = PROJECT_DIR / "scripts" / "processar_nota_xp.py"
 XP_SENHA = os.environ.get("XP_NOTAS_PASSWORD")
 
 REMETENTE_XP = "noreply@xpi.com.br"
