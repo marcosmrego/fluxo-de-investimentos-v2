@@ -1,10 +1,13 @@
 """FastAPI — Dashboard Carteira Prof. Marcos (climate-style)."""
 
 import os
+import base64
+import binascii
+import secrets
 from pathlib import Path
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import URL, create_engine, text
 
@@ -35,8 +38,46 @@ DB_URL = URL.create(
 
 engine = create_engine(DB_URL, pool_pre_ping=True, pool_recycle=300)
 
+_dashboard_username = os.environ.get("DASHBOARD_USERNAME", "")
+_dashboard_password = os.environ.get("DASHBOARD_PASSWORD", "")
+if not _dashboard_username:
+    raise RuntimeError("DASHBOARD_USERNAME must be configured")
+if not _dashboard_password:
+    raise RuntimeError("DASHBOARD_PASSWORD must be configured")
+
 # ── App ────────────────────────────────────────────────────────
-app = FastAPI(title="Dashboard Carteira")
+app = FastAPI(title="Dashboard Carteira", docs_url=None, redoc_url=None)
+
+
+def _authenticated(authorization: str | None) -> bool:
+    if not authorization or not authorization.startswith("Basic "):
+        return False
+    try:
+        raw = base64.b64decode(authorization[6:], validate=True).decode("utf-8")
+        username, password = raw.split(":", 1)
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        return False
+    return secrets.compare_digest(username, _dashboard_username) and secrets.compare_digest(
+        password, _dashboard_password
+    )
+
+
+@app.middleware("http")
+async def protect_dashboard(request: Request, call_next):
+    if request.url.path != "/health" and not _authenticated(
+        request.headers.get("authorization")
+    ):
+        return JSONResponse(
+            {"detail": "authentication required"},
+            status_code=401,
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 static = Path(__file__).parent / "static"
 static.mkdir(exist_ok=True)

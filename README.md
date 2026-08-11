@@ -57,6 +57,30 @@ pip install psycopg2-binary reportlab matplotlib pandas numpy yfinance
 
 ## Uso
 
+Antes de iniciar o dashboard, configure credenciais exclusivas em `.env`:
+
+```bash
+DASHBOARD_USERNAME=investidor
+DASHBOARD_PASSWORD=uma_senha_longa_e_aleatoria
+```
+
+O dashboard usa autenticação HTTP Basic. Em produção, publique-o somente por
+HTTPS; sem TLS, usuário e senha podem ser interceptados na rede. O endpoint
+`/health` permanece público para o health check do container.
+
+```bash
+# Dashboard local
+uvicorn dashboard.main:app --host 127.0.0.1 --port 3000
+
+# Imagem de produção (execute a partir da raiz do repositório)
+docker build -t fluxo-investimentos .
+docker run --env-file .env -p 127.0.0.1:3000:3000 fluxo-investimentos
+```
+
+O container roda com usuário sem privilégios e valida `/health`
+periodicamente. O `dashboard/Dockerfile` também deve ser construído usando a
+raiz como contexto: `docker build -f dashboard/Dockerfile .`.
+
 ```bash
 # Relatório executivo completo
 python scripts/relatorio_executivo.py
