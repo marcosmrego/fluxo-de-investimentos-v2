@@ -89,6 +89,25 @@ python scripts/relatorio_executivo.py
 python scripts/backfill_historico.py
 ```
 
+### Importação automática das notas XP
+
+O importador lê os PDFs do Gmail e faz extração local; documentos financeiros
+não são enviados a serviços externos. Instale as dependências isoladas com:
+
+```bash
+uv venv .venv-automation
+uv pip install --python .venv-automation/bin/python -r requirements-automation.txt
+.venv-automation/bin/python scripts/buscar_notas_gmail.py --dias 7
+```
+
+Variáveis obrigatórias: `XP_NOTAS_PASSWORD`, banco PostgreSQL e os arquivos
+OAuth do Gmail. O job de produção roda no minuto 17 de cada hora através de
+`/etc/cron.d/investimentos-import`, protegido por `flock`. Consulte os logs com
+`journalctl -t investimentos-import`.
+
+O processo é fail-closed: PDF inválido, operação não reconciliada ou ticker não
+resolvido aborta a nota inteira antes do commit.
+
 ## Licença
 
 Privado — Uso pessoal.
