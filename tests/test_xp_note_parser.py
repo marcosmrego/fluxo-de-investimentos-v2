@@ -1,8 +1,13 @@
 from decimal import Decimal
+from pathlib import Path
+import sys
 
 import pytest
 
 from scripts.xp_note_parser import NoteParseError, parse_xp_document
+
+SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS_DIR))
 
 
 HEADER_TEXT = """
@@ -139,6 +144,15 @@ def test_duplicate_note_is_considered_handled_by_gmail_importer(monkeypatch, tmp
         stdout = "[PULAR] Nota 987654 já existe no banco"
         stderr = ""
 
-    monkeypatch.setattr(buscar_notas_gmail.subprocess, "run", lambda *args, **kwargs: Result())
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        return Result()
+
+    monkeypatch.setattr(buscar_notas_gmail.subprocess, "run", fake_run)
+    monkeypatch.setattr(buscar_notas_gmail, "XP_SENHA", None)
 
     assert buscar_notas_gmail.processar_pdf(note, "gmail-message-id") is True
+    assert None not in captured["command"]
+    assert "--senha" not in captured["command"]

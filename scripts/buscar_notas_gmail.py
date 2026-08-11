@@ -148,9 +148,10 @@ def processar_pdf(pdf_path: Path, email_id: str) -> bool:
     cmd = [
         sys.executable, str(PROCESSOR_SCRIPT),
         str(pdf_path),
-        "--senha", XP_SENHA,
         "--email-id", email_id,
     ]
+    if XP_SENHA:
+        cmd.extend(["--senha", XP_SENHA])
 
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     print(result.stdout)
