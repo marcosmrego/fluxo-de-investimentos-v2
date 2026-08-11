@@ -34,7 +34,7 @@ GMAIL_TOKEN = Path("/home/hermes/.hermes/google_token_notas.json")
 GMAIL_SECRET = Path("/home/hermes/.hermes/google_client_secret_notas.json")
 DOWNLOAD_DIR = Path("/tmp/notas_xp")
 PROCESSOR_SCRIPT = Path("/opt/data/fluxo-de-investimentos-v2/scripts/processar_nota_xp.py")
-XP_SENHA = "822"
+XP_SENHA = os.environ.get("XP_NOTAS_PASSWORD")
 
 REMETENTE_XP = "noreply@xpi.com.br"
 ASSUNTO_XP = "Nota de Negociação"
@@ -157,7 +157,10 @@ def processar_pdf(pdf_path: Path, email_id: str) -> bool:
     if result.returncode != 0:
         print(f"[ERRO] {result.stderr}")
         return False
-    return "processada com sucesso" in result.stdout
+    return (
+        "processada com sucesso" in result.stdout
+        or "já existe no banco" in result.stdout
+    )
 
 
 def main():

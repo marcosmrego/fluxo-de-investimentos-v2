@@ -4,7 +4,7 @@ Processador de Notas de Corretagem XP.
 
 Fluxo:
   1. Recebe PDF(s) de nota XP (arquivo ou diretório)
-  2. Envia para API parser (parserxp.expansao-ai.com.br)
+  2. Extrai e interpreta o PDF localmente
   3. Insere no Postgres: notas_negociacao → operacoes → operacoes_consolidadas_nota → posicoes
   4. Atualiza emails_processados (controle de duplicatas)
 
@@ -27,13 +27,9 @@ from typing import Optional
 
 import psycopg2
 from psycopg2.extras import execute_values
-import requests
-
-# ─── CONFIG ────────────────────────────────────────────────────────────────
-
-API_PARSER_URL = "https://parserxp.expansao-ai.com.br/parse/xp-note"
 
 from db_utils import DB_CONFIG
+from xp_note_parser import parse_xp_pdf
 
 
 
@@ -123,30 +119,20 @@ def resolver_tickers(operacoes: list, conn) -> list:
     return operacoes
 
 
-# ─── PARSER (via API) ──────────────────────────────────────────────────────
+def validar_operacoes_para_gravacao(operacoes: list) -> None:
+    """Refuse partial imports that would silently omit a portfolio position."""
+    for operation in operacoes:
+        if not operation.get("ticker"):
+            description = operation.get("descricao_ativo") or "desconhecido"
+            raise ValueError(f"ticker não resolvido para: {description}")
+
+
+# ─── PARSER LOCAL ──────────────────────────────────────────────────────────
 
 def parse_pdf(pdf_path: Path, password: Optional[str] = None) -> dict:
-    """Envia PDF para API parser e retorna o JSON parseado."""
-    print(f"  [PARSER] Enviando {pdf_path.name}...", end=" ")
-
-    with open(pdf_path, "rb") as f:
-        files = {"file": (pdf_path.name, f, "application/pdf")}
-        data = {}
-        if password:
-            data["password"] = password
-
-        try:
-            resp = requests.post(API_PARSER_URL, files=files, data=data, timeout=60)
-            resp.raise_for_status()
-            result = resp.json()
-        except requests.RequestException as e:
-            print(f"ERRO: {e}")
-            raise
-
-    if not result.get("success"):
-        error = result.get("error", "Erro desconhecido")
-        print(f"FALHA: {error}")
-        raise ValueError(f"Parser retornou erro: {error}")
+    """Interpreta uma nota localmente, sem transmitir o PDF a terceiros."""
+    print(f"  [PARSER LOCAL] Extraindo {pdf_path.name}...", end=" ")
+    result = parse_xp_pdf(pdf_path, password=password)
 
     header = result.get("header", {})
     print(f"OK (nota {header.get('numero_nota', '?')}, "
@@ -531,6 +517,7 @@ def processar_pdf(pdf_path: Path, conn, password: Optional[str] = None,
     # 2. Resolve tickers ausentes
     operacoes_brutas = parsed.get("operacoes_brutas", [])
     operacoes_brutas = resolver_tickers(operacoes_brutas, conn)
+    validar_operacoes_para_gravacao(operacoes_brutas)
     parsed["operacoes_brutas"] = operacoes_brutas
 
     # Re-consolida com tickers resolvidos
@@ -554,11 +541,10 @@ def processar_pdf(pdf_path: Path, conn, password: Optional[str] = None,
         inserir_operacoes(conn, nota_id, parsed.get("operacoes_brutas", []))
         inserir_consolidadas(conn, nota_id, parsed.get("operacoes_consolidadas", []))
         atualizar_posicoes(conn, parsed.get("operacoes_brutas", []))
-        conn.commit()
-
         if email_id:
             registrar_email_processado(conn, email_id, pdf_path.name,
                                        "sucesso", registro_id=email_uuid)
+        conn.commit()
 
         print(f"  [OK] Nota {numero_nota} processada com sucesso")
         return True

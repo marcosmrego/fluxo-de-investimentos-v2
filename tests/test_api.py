@@ -62,7 +62,8 @@ def test_health_is_public_and_does_not_expose_database_errors(monkeypatch):
 
 def test_startup_rejects_missing_auth_secret(monkeypatch):
     monkeypatch.setenv("DASHBOARD_USERNAME", "investidor")
-    monkeypatch.delenv("DASHBOARD_PASSWORD", raising=False)
+    # Empty environment value must win over a developer's local .env file.
+    monkeypatch.setenv("DASHBOARD_PASSWORD", "")
     import dashboard.main as main
 
     try:
