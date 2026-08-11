@@ -157,6 +157,52 @@ def test_resolves_verified_b3_descriptions(description, ticker):
     assert processar_nota_xp.ticker_oficial_por_descricao(description) == ticker
 
 
+def test_verified_tickers_have_asset_metadata():
+    import processar_nota_xp
+
+    assert processar_nota_xp.ATIVOS_B3_VERIFICADOS["SPCX34"]["tipo"] == "BDR"
+    assert processar_nota_xp.ATIVOS_B3_VERIFICADOS["ROXO34"]["tipo"] == "BDR"
+
+
+def test_asset_registration_precedes_note_write(monkeypatch, tmp_path):
+    import processar_nota_xp
+
+    note = tmp_path / "nota.pdf"
+    note.write_bytes(b"%PDF-test")
+    parsed = {
+        "header": {"numero_nota": "987654"},
+        "financeiro": {},
+        "operacoes_brutas": [{
+            "ticker": "SPCX34",
+            "descricao_ativo": "SPACE X DRN",
+            "tipo_operacao": "COMPRA",
+            "quantidade": 2,
+            "preco_unitario": Decimal("45.41"),
+            "valor_operacao": Decimal("90.82"),
+        }],
+    }
+    events = []
+
+    class Connection:
+        def commit(self):
+            events.append("commit")
+
+        def rollback(self):
+            events.append("rollback")
+
+    monkeypatch.setattr(processar_nota_xp, "parse_pdf", lambda *_: parsed)
+    monkeypatch.setattr(processar_nota_xp, "resolver_tickers", lambda ops, conn: ops)
+    monkeypatch.setattr(processar_nota_xp, "nota_ja_processada", lambda *_: False)
+    monkeypatch.setattr(processar_nota_xp, "garantir_cadastros_ativos", lambda *_: events.append("ativos"))
+    monkeypatch.setattr(processar_nota_xp, "inserir_nota", lambda *_args, **_kwargs: events.append("nota") or "id")
+    monkeypatch.setattr(processar_nota_xp, "inserir_operacoes", lambda *_: None)
+    monkeypatch.setattr(processar_nota_xp, "inserir_consolidadas", lambda *_: None)
+    monkeypatch.setattr(processar_nota_xp, "atualizar_posicoes", lambda *_: events.append("posicoes"))
+
+    assert processar_nota_xp.processar_pdf(note, Connection()) is True
+    assert events == ["ativos", "nota", "posicoes", "commit"]
+
+
 def test_duplicate_note_is_considered_handled_by_gmail_importer(monkeypatch, tmp_path):
     import buscar_notas_gmail
 

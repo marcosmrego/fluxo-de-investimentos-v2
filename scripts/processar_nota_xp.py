@@ -40,6 +40,24 @@ DESCRICOES_B3_VERIFICADAS = {
     "BTG S&P 500 CI": "SPXB11",
 }
 
+ATIVOS_B3_VERIFICADOS = {
+    "SPCX34": {
+        "nome": "Space Exploration Technologies Corp.",
+        "tipo": "BDR",
+        "setor": "Tecnologia",
+    },
+    "ROXO34": {
+        "nome": "Nu Holdings Ltd.",
+        "tipo": "BDR",
+        "setor": "Financeiro",
+    },
+    "SPXB11": {
+        "nome": "BTG Pactual S&P 500 Fundo de Indice",
+        "tipo": "ETF",
+        "setor": "Indice",
+    },
+}
+
 
 def ticker_oficial_por_descricao(description: str) -> Optional[str]:
     normalized = " ".join((description or "").upper().split())
@@ -227,6 +245,46 @@ def nota_ja_processada(conn, numero_nota: str) -> bool:
     exists = cur.fetchone() is not None
     cur.close()
     return exists
+
+
+def garantir_cadastros_ativos(conn, operacoes: list) -> None:
+    """Garante que toda operação resolvida referencia um ativo cadastrado."""
+    tickers = sorted({op["ticker"] for op in operacoes if op.get("ticker")})
+    if not tickers:
+        return
+
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "SELECT ticker FROM investimentos.ativos WHERE ticker = ANY(%s)",
+            (tickers,),
+        )
+        existentes = {row[0] for row in cur.fetchall()}
+        ausentes = [ticker for ticker in tickers if ticker not in existentes]
+
+        sem_metadados = [
+            ticker for ticker in ausentes if ticker not in ATIVOS_B3_VERIFICADOS
+        ]
+        if sem_metadados:
+            raise ValueError(
+                "ativo sem cadastro e sem metadados verificados: "
+                + ", ".join(sem_metadados)
+            )
+
+        for ticker in ausentes:
+            ativo = ATIVOS_B3_VERIFICADOS[ticker]
+            cur.execute(
+                """
+                INSERT INTO investimentos.ativos
+                    (ticker, nome, tipo, setor, monitorar)
+                VALUES (%s, %s, %s, %s, TRUE)
+                ON CONFLICT (ticker) DO NOTHING
+                """,
+                (ticker, ativo["nome"], ativo["tipo"], ativo["setor"]),
+            )
+            print(f"  [DB] Ativo {ticker} cadastrado")
+    finally:
+        cur.close()
 
 
 def inserir_nota(conn, parsed: dict, email_id: Optional[str] = None,
@@ -551,6 +609,7 @@ def processar_pdf(pdf_path: Path, conn, password: Optional[str] = None,
     # 3. Insere no banco (transação única)
     nota_id = None
     try:
+        garantir_cadastros_ativos(conn, parsed.get("operacoes_brutas", []))
         # Registra email processado primeiro (FK constraint)
         if email_id:
             registrar_email_processado(conn, email_id, pdf_path.name,
