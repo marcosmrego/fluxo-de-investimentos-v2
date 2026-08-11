@@ -3,6 +3,10 @@ BEGIN;
 ALTER TABLE investimentos.ativos
     ADD COLUMN IF NOT EXISTS moeda VARCHAR(3) NOT NULL DEFAULT 'BRL';
 
+UPDATE investimentos.ativos
+SET moeda = 'USD'
+WHERE ticker IN ('QQQ', 'SPHD');
+
 ALTER TABLE investimentos.posicoes
     ADD COLUMN IF NOT EXISTS moeda VARCHAR(3) NOT NULL DEFAULT 'BRL',
     ADD COLUMN IF NOT EXISTS preco_medio_origem NUMERIC(18, 6),

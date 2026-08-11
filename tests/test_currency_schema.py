@@ -12,3 +12,4 @@ def test_currency_migration_preserves_brl_defaults_and_native_values():
     assert "fechamento_origem" in migration
     assert "taxa_cambio" in migration
     assert "preco_medio_origem" in migration
+    assert "WHERE ticker IN ('QQQ', 'SPHD')" in migration
