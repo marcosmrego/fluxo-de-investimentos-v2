@@ -135,7 +135,7 @@ def auditar(conn) -> tuple[int, int, int, object]:
         LEFT JOIN investimentos.cotacoes c
           ON c.ticker = p.ticker
          AND c.data >= CURRENT_DATE - INTERVAL '7 days'
-        WHERE p.quantidade_total > 0
+        WHERE p.quantidade_total > 0 AND a.monitorar = TRUE
     """)
     result = cursor.fetchone()
     cursor.close()
