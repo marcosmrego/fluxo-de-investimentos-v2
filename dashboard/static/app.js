@@ -133,31 +133,47 @@ async function carregarStatus() {
 }
 
 let chartEvolucao = null;
+function agruparFechamentosMensais(historico) {
+    const meses = new Map();
+    historico.forEach(registro => {
+        const chave = registro.data.slice(0, 7);
+        meses.set(chave, registro);
+    });
+    return Array.from(meses.entries()).map(([mes, registro]) => ({
+        label: new Intl.DateTimeFormat("pt-BR", {
+            month: "short",
+            year: "2-digit",
+            timeZone: "UTC",
+        }).format(new Date(`${mes}-01T00:00:00Z`)),
+        valor: registro.valor_total,
+    }));
+}
+
 async function carregarEvolucao() {
     try {
-        const res = await fetch(`${API_BASE}/api/rentabilidade?dias=90`);
+        const res = await fetch(`${API_BASE}/api/rentabilidade?dias=365`);
         if (!res.ok) throw new Error(res.status);
         const d = await res.json();
         if (!d.historico.length) return;
 
-        const labels = d.historico.map(r => r.data.slice(0, 10));
-        const valores = d.historico.map(r => r.valor_total);
+        const mensal = agruparFechamentosMensais(d.historico);
+        const labels = mensal.map(r => r.label);
+        const valores = mensal.map(r => r.valor);
 
         const ctx = document.getElementById("chart-evolucao").getContext("2d");
         if (chartEvolucao) chartEvolucao.destroy();
         chartEvolucao = new Chart(ctx, {
-            type: "line",
+            type: "bar",
             data: {
                 labels,
                 datasets: [{
                     label: "Patrimônio",
                     data: valores,
+                    backgroundColor: "rgba(94,200,248,0.72)",
                     borderColor: COLORS.accent,
-                    backgroundColor: "rgba(94,200,248,0.05)",
-                    borderWidth: 2,
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 0,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    maxBarThickness: 48,
                 }]
             },
             options: {

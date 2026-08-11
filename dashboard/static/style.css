@@ -208,6 +208,10 @@ header h1 {
     gap: 24px;
     margin-bottom: 24px;
 }
+.overview-charts {
+    grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+}
+.overview-charts .chart-wrap { height: 360px; }
 .card-half { margin-bottom: 0; }
 
 .quality-card { border-color: rgba(94, 200, 248, .28); }

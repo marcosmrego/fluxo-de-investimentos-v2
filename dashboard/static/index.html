@@ -75,17 +75,19 @@
             <div class="kpi-card"><div class="kpi-label">📅 Prov. Mês</div><div class="kpi-value skeleton" id="kpi-prov-mes">—</div></div>
         </div>
 
-        <!-- Gráfico: Evolução -->
-        <section class="card">
-            <h2>📈 Evolução do Patrimônio</h2>
-            <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
-        </section>
+        <div class="charts-row overview-charts">
+            <!-- Gráfico: Evolução anual -->
+            <section class="card card-half">
+                <h2>📊 Evolução Anual do Patrimônio</h2>
+                <div class="chart-wrap"><canvas id="chart-evolucao"></canvas></div>
+            </section>
 
-        <!-- Gráfico: Distribuição -->
-        <section class="card">
-            <h2>🎯 Diversificação por Tipo</h2>
-            <div class="chart-wrap chart-wrap-sm"><canvas id="chart-donut"></canvas></div>
-        </section>
+            <!-- Gráfico: Distribuição -->
+            <section class="card card-half">
+                <h2>🎯 Diversificação por Tipo</h2>
+                <div class="chart-wrap"><canvas id="chart-donut"></canvas></div>
+            </section>
+        </div>
 
         <!-- Top 5 -->
         <section class="card">
