@@ -1,0 +1,7 @@
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+MAILTO=""
+CRON_TZ=America/Sao_Paulo
+
+17 * * * * root /usr/bin/flock -n /var/lock/investimentos-import.lock /usr/bin/docker exec -u hermes hermes-agent-a11cqkott97egnix7puwjr1n /opt/data/fluxo-de-investimentos-v2/.venv-automation/bin/python /opt/data/fluxo-de-investimentos-v2/scripts/buscar_notas_gmail.py --dias 7 2>&1 | /usr/bin/logger -t investimentos-import
+15 19 * * 1-5 root /usr/bin/flock -n /var/lock/investimentos-cotacoes.lock /usr/bin/docker exec -u hermes hermes-agent-a11cqkott97egnix7puwjr1n /opt/data/fluxo-de-investimentos-v2/.venv-automation/bin/python /opt/data/fluxo-de-investimentos-v2/scripts/atualizar_cotacoes.py 2>&1 | /usr/bin/logger -t investimentos-cotacoes
