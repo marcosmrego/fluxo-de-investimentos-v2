@@ -91,6 +91,15 @@ def test_accepts_brazilian_numbers_with_thousands_and_decimal_comma():
     assert operation["valor_operacao"] == Decimal("1831.00")
 
 
+def test_parses_xp_table_when_pdf_omits_the_header_row():
+    extracted_without_header = [OPERATIONS_TABLE[1]]
+
+    result = parse_xp_document(HEADER_TEXT, [extracted_without_header])
+
+    assert len(result["operacoes_brutas"]) == 1
+    assert result["operacoes_brutas"][0]["tipo_operacao"] == "COMPRA"
+
+
 def test_processador_uses_local_parser(monkeypatch, tmp_path):
     import sys
     from pathlib import Path

@@ -16,6 +16,17 @@ from typing import Iterable, Sequence
 MAX_PDF_BYTES = 10 * 1024 * 1024
 MAX_PAGES = 20
 MONEY_TOLERANCE = Decimal("0.02")
+XP_OPERATION_COLUMNS = {
+    "negociacao": 0,
+    "side": 2,
+    "market": 3,
+    "description": 5,
+    "observations": 6,
+    "quantity": 7,
+    "price": 8,
+    "total": 9,
+    "dc": 10,
+}
 
 
 class NoteParseError(ValueError):
@@ -139,6 +150,8 @@ def _operations(tables: Iterable[Sequence[Sequence[object]]]) -> list[dict]:
             if candidate:
                 indexes = candidate
                 continue
+            if indexes is None and len(row) >= 11 and _cell(row, 2).upper() in {"C", "V"}:
+                indexes = XP_OPERATION_COLUMNS
             if indexes is None or not _cell(row, indexes["side"]):
                 continue
             operations.append(_operation(row, indexes))
