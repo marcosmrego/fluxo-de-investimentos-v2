@@ -105,6 +105,36 @@ async function carregarQualidade() {
     }
 }
 
+async function carregarSaudeCarteira() {
+    try {
+        const res = await fetch(`${API_BASE}/api/saude-carteira`);
+        if (!res.ok) throw new Error(res.status);
+        const d = await res.json();
+        const score = document.getElementById("health-score");
+        score.textContent = d.score ?? "—";
+        score.dataset.level = d.score >= 80 ? "good" : d.score >= 60 ? "medium" : "high";
+        document.getElementById("health-classification").textContent = d.classification;
+        document.getElementById("health-summary").textContent = d.summary;
+        document.getElementById("health-confidence").textContent = `Confiabilidade: ${d.confidence}`;
+        document.getElementById("health-pillars").innerHTML = d.pillars.map(p => `
+            <div class="health-pillar"><div><span>${safe(p.label)}</span><strong>${p.score}/100</strong></div>
+            <div class="health-track"><i style="width:${p.score}%"></i></div></div>`).join("");
+        const m = d.metrics;
+        document.getElementById("health-metrics").innerHTML = [
+            ["Ativos efetivos", m.effective_assets ?? "—"],
+            ["Maior posição", m.largest_position_pct != null ? fmtPctPlain(m.largest_position_pct) : "—"],
+            ["Maior setor", m.largest_sector_pct != null ? `${safe(m.largest_sector)} · ${fmtPctPlain(m.largest_sector_pct)}` : "—"],
+            ["Volatilidade estimada", m.annualized_volatility_pct != null ? fmtPctPlain(m.annualized_volatility_pct) : "—"],
+            ["Drawdown estimado", m.max_drawdown_pct != null ? fmtPctPlain(m.max_drawdown_pct) : "—"],
+        ].map(([label, value]) => `<div><span>${label}</span><strong>${value}</strong></div>`).join("");
+        document.getElementById("health-alerts").innerHTML = d.alerts.map(a =>
+            `<li class="health-alert health-alert-${safe(a.level)}">${safe(a.text)}</li>`).join("");
+        document.getElementById("health-methodology").textContent = d.methodology || "";
+    } catch {
+        registrarErro("saúde da carteira");
+    }
+}
+
 async function carregarStatus() {
     try {
         const res = await fetch(`${API_BASE}/api/status`);
@@ -597,4 +627,5 @@ async function carregarAnalise() {
 
 // ── Init ────────────────────────────────────────────────────────
 carregarPosicoes();
+carregarSaudeCarteira();
 tabsLoaded.posicoes = true;

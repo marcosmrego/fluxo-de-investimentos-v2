@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import URL, create_engine, text
 
 from dashboard.metrics import percentage_change, portfolio_weight
+from dashboard.portfolio_health import compute_portfolio_health
 
 # ── DB Config ──────────────────────────────────────────────────
 _env_path = Path(__file__).resolve().parent.parent / ".env"
@@ -249,6 +250,39 @@ async def distribuicao():
         """)).fetchall(),
             ["tipo", "valor"])
     return {"distribuicao": rows}
+
+
+@app.get("/api/saude-carteira")
+async def saude_carteira():
+    """Diagnostico consolidado, explicavel e conservador da carteira atual."""
+    with engine.connect() as conn:
+        positions = _df(conn.execute(text("""
+            SELECT p.ticker, a.setor,
+                   COALESCE(c.fechamento * p.quantidade_total, 0) AS valor,
+                   (c.fechamento IS NOT NULL) AS possui_cotacao,
+                   (a.ticker IS NOT NULL) AS cadastrado
+            FROM investimentos.posicoes p
+            LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
+            LEFT JOIN LATERAL (
+                SELECT fechamento FROM investimentos.cotacoes
+                WHERE ticker = p.ticker ORDER BY data DESC LIMIT 1
+            ) c ON true
+            WHERE p.quantidade_total > 0
+        """)).fetchall(), ["ticker", "setor", "valor", "possui_cotacao", "cadastrado"])
+        returns = conn.execute(text("""
+            SELECT rentabilidade FROM investimentos.rentabilidade_diaria
+            WHERE rentabilidade IS NOT NULL ORDER BY data DESC LIMIT 252
+        """)).fetchall()
+
+    return compute_portfolio_health(
+        [{
+            "ticker": p["ticker"], "sector": p["setor"],
+            "value": float(p["valor"] or 0), "has_quote": p["possui_cotacao"],
+            "registered": p["cadastrado"],
+        } for p in positions],
+        [float(row[0]) for row in reversed(returns)],
+        historical_data_reliable=False,
+    )
 
 
 @app.get("/api/rentabilidade")

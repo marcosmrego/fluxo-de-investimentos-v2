@@ -47,6 +47,25 @@
     <!-- ── Tab: Início ──────────────────────────────── -->
     <div class="tab-panel" id="tab-inicio">
 
+        <section class="card health-card" aria-labelledby="health-title">
+            <div class="health-overview">
+                <div class="health-score" id="health-score">—</div>
+                <div>
+                    <p class="eyebrow">SAÚDE DA CARTEIRA</p>
+                    <h2 id="health-title">Diagnóstico consolidado</h2>
+                    <strong class="health-classification" id="health-classification">Calculando...</strong>
+                    <p class="health-summary" id="health-summary"></p>
+                    <p class="caption" id="health-confidence"></p>
+                </div>
+            </div>
+            <div class="health-pillars" id="health-pillars"></div>
+            <div class="health-details">
+                <div><h3>Indicadores-chave</h3><div class="health-metrics" id="health-metrics"></div></div>
+                <div><h3>Alertas e próximos pontos de atenção</h3><ul class="health-alerts" id="health-alerts"></ul></div>
+            </div>
+            <details><summary>Como a nota é calculada</summary><p class="caption" id="health-methodology"></p></details>
+        </section>
+
         <section class="card quality-card">
             <div class="quality-header">
                 <div>
