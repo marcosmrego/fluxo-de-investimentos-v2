@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from typing import Any, Iterable
@@ -46,11 +46,19 @@ def _positive_quantity(value: Any, ticker: str) -> Decimal:
 def _is_complete_thesis(thesis: dict[str, Any] | None) -> bool:
     if not thesis or thesis.get("origin") == ThesisOrigin.UNKNOWN.value:
         return False
+    risks = thesis.get("risks")
+    review_triggers = thesis.get("review_triggers")
+    valid_risks = isinstance(risks, list) and any(
+        str(item).strip() for item in risks
+    )
+    valid_triggers = isinstance(review_triggers, list) and any(
+        str(item).strip() for item in review_triggers
+    )
     return all((
         bool(str(thesis.get("summary") or "").strip()),
         bool(str(thesis.get("horizon") or "").strip()),
-        bool(thesis.get("risks")),
-        bool(thesis.get("review_triggers")),
+        valid_risks,
+        valid_triggers,
         bool(thesis.get("recorded_at")),
     ))
 
@@ -73,8 +81,10 @@ def _index_theses(theses: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]
             raise ValueError(f"decision_at is required for contemporary thesis {ticker}")
         if origin == ThesisOrigin.CONTEMPORARY.value:
             decision_at = _aware_datetime(thesis["decision_at"], "decision_at", ticker)
-            if recorded_at < decision_at:
-                raise ValueError(f"recorded_at cannot be before decision_at for {ticker}")
+            if recorded_at - decision_at > timedelta(hours=24):
+                raise ValueError(
+                    f"recorded_at must be within 24 hours after decision_at for {ticker}"
+                )
 
         thesis["ticker"] = ticker
         indexed[ticker] = thesis

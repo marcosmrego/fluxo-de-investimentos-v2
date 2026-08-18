@@ -32,7 +32,7 @@ O produto não deve responder apenas “quanto a carteira rendeu?”. Ele deve r
 
 CMIN3 será o primeiro caso com decisão e execução contemporâneas, mas não o único ativo do piloto. Todas as posições abertas entram desde o primeiro ciclo, com uma distinção obrigatória:
 
-- **Tese contemporânea:** registrada antes ou no momento da decisão, com snapshot completo disponível naquela data.
+- **Tese contemporânea:** registrada antes da decisão ou em até 24 horas depois, com snapshot do que estava disponível; após esse limite, deve ser classificada como reconstruída.
 - **Tese atual reconstruída:** fotografia da visão atual sobre uma posição antiga; não pode ser apresentada como justificativa original da compra.
 - **Origem desconhecida:** quando não houver evidência suficiente, o sistema preserva explicitamente a lacuna em vez de inventar uma narrativa.
 

@@ -127,7 +127,7 @@ def test_contemporary_thesis_requires_valid_timezone_aware_decision(decision_at)
         build_investment_inventory(positions, theses)
 
 
-def test_contemporary_thesis_cannot_be_recorded_before_the_decision():
+def test_contemporary_thesis_can_be_recorded_before_the_decision():
     positions = [{"ticker": "CMIN3", "quantity": 10, "market_value": 57.50}]
     theses = [{
         "ticker": "CMIN3",
@@ -140,7 +140,25 @@ def test_contemporary_thesis_cannot_be_recorded_before_the_decision():
         "review_triggers": ["Resultado trimestral"],
     }]
 
-    with pytest.raises(ValueError, match="before decision_at"):
+    inventory = build_investment_inventory(positions, theses)
+
+    assert inventory["positions"][0]["is_original_decision_memory"] is True
+
+
+def test_contemporary_thesis_cannot_be_recorded_more_than_24h_after_decision():
+    positions = [{"ticker": "CMIN3", "quantity": 10, "market_value": 57.50}]
+    theses = [{
+        "ticker": "CMIN3",
+        "origin": ThesisOrigin.CONTEMPORARY.value,
+        "summary": "Compra inicial.",
+        "recorded_at": "2026-08-19T10:00:01-03:00",
+        "decision_at": "2026-08-18T10:00:00-03:00",
+        "horizon": "2 a 4 anos",
+        "risks": ["Minerio"],
+        "review_triggers": ["Resultado trimestral"],
+    }]
+
+    with pytest.raises(ValueError, match="within 24 hours"):
         build_investment_inventory(positions, theses)
 
 

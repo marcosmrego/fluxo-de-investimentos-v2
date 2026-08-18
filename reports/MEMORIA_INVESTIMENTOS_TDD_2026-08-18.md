@@ -18,8 +18,8 @@ Resultado antes da implementação: erro de coleta `ModuleNotFoundError: No modu
 
 Comandos executados:
 
-- `pytest -q tests\test_investment_memory.py` — 13 testes aprovados após a revisão adversarial.
-- `pytest -q` — 53 testes aprovados, 1 aviso externo de depreciação.
+- `pytest -q tests\test_investment_memory.py` — 14 testes aprovados após duas rodadas de revisão adversarial.
+- `pytest -q` — 54 testes aprovados, 1 aviso externo de depreciação.
 
 ## Garantias
 
@@ -31,7 +31,7 @@ Comandos executados:
 | Tese contemporânea exige instante da decisão | `test_contemporary_thesis_requires_decision_timestamp` | unitário | PASS |
 | Duas teses correntes para o mesmo ticker são rejeitadas | `test_inventory_rejects_duplicate_current_theses_for_the_same_ticker` | unitário | PASS |
 | Classificação de origem desconhecida pelo domínio é rejeitada | `test_inventory_rejects_unknown_thesis_origin_instead_of_guessing` | unitário | PASS |
-| Datas contemporâneas precisam ser ISO válidas, possuir fuso e respeitar a ordem decisão → registro | testes `test_contemporary_*` | unitário | PASS |
+| Datas contemporâneas precisam ser ISO válidas, possuir fuso e ser registradas antes ou em até 24 horas após a decisão | testes `test_contemporary_*` | unitário | PASS |
 | Tese só conta como completa com resumo, horizonte, riscos, gatilhos e data de registro | `test_thesis_is_not_complete_when_minimum_decision_fields_are_missing` | unitário | PASS |
 | Quantidades inválidas, infinitas ou NaN são rejeitadas | `test_inventory_rejects_invalid_position_quantities` | unitário | PASS |
 | Posições abertas duplicadas são rejeitadas até existir identidade canônica por conta/instrumento | `test_inventory_rejects_duplicate_open_positions_until_identity_is_canonical` | unitário | PASS |
