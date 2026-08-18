@@ -39,3 +39,4 @@ def test_published_thesis_versions_are_protected_by_database_trigger():
     assert "CREATE OR REPLACE FUNCTION investimentos.proteger_tese_publicada" in sql
     assert "BEFORE UPDATE OR DELETE" in sql
     assert "conteudo de tese publicada e imutavel" in sql
+    assert "to_jsonb(NEW) - ARRAY['status', 'atualizado_em']" in sql
