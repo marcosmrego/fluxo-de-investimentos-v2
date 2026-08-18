@@ -18,6 +18,7 @@ from dashboard.metrics import percentage_change, portfolio_weight
 from dashboard.investment_memory import (
     build_investment_inventory,
     create_initial_thesis_draft,
+    generate_fundamental_proposal,
     validate_thesis_publication,
 )
 from dashboard.portfolio_health import compute_portfolio_health
@@ -170,6 +171,36 @@ def load_position_thesis_inventory():
             "recorded_at": row["registrada_em"].isoformat() if row["registrada_em"] else None,
         })
     return build_investment_inventory(normalized, theses)
+
+
+def load_automatic_thesis_proposal(ticker: str) -> dict:
+    normalized_ticker = ticker.strip().upper()
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT p.ticker, a.nome, a.tipo, a.setor,
+                   i.p_l, i.p_vp, i.roe, i.roic, i.dividend_yield,
+                   i.div_liq_patrim, i.cres_rec_5a, i.data_coleta
+            FROM investimentos.posicoes p
+            LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
+            LEFT JOIN LATERAL (
+                SELECT p_l, p_vp, roe, roic, dividend_yield,
+                       div_liq_patrim, cres_rec_5a, data_coleta
+                FROM investimentos.indicadores_fundamentalistas_v2
+                WHERE ticker = p.ticker ORDER BY data_coleta DESC LIMIT 1
+            ) i ON true
+            WHERE p.ticker = :ticker AND p.quantidade_total > 0
+        """), {"ticker": normalized_ticker}).mappings().first()
+    if not row:
+        raise LookupError(f"open position not found for {normalized_ticker}")
+    return generate_fundamental_proposal({
+        "ticker": row["ticker"], "name": row["nome"],
+        "asset_type": row["tipo"], "sector": row["setor"],
+    }, {
+        key: row[key] for key in (
+            "p_l", "p_vp", "roe", "roic", "dividend_yield",
+            "div_liq_patrim", "cres_rec_5a", "data_coleta",
+        )
+    } if row["data_coleta"] else None)
 
 
 class ThesisPublicationRequest(BaseModel):
@@ -375,6 +406,14 @@ async def filtros():
 async def teses_inventario():
     """Cobertura inicial de teses para todas as posicoes abertas."""
     return load_position_thesis_inventory()
+
+
+@app.get("/api/teses/{ticker}/proposta")
+async def proposta_automatica_tese(ticker: str):
+    try:
+        return load_automatic_thesis_proposal(ticker)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/teses/{ticker}/publicar")

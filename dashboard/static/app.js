@@ -117,17 +117,29 @@ function linhas(text) {
     return String(text || "").split("\n").map(item => item.trim()).filter(Boolean);
 }
 
-function abrirRevisaoTese(item) {
+async function abrirRevisaoTese(item) {
     if (!item) return;
     resetarFormularioTese();
     document.getElementById("thesis-ticker").value = item.ticker;
     document.getElementById("thesis-dialog-title").textContent = `Revisar ${item.ticker}`;
-    document.getElementById("thesis-summary").value = item.thesis_summary || "";
-    document.getElementById("thesis-horizon").value = "";
-    document.getElementById("thesis-risks").value = (item.risks || []).join("\n");
-    document.getElementById("thesis-triggers").value = (item.review_triggers || []).join("\n");
-    document.getElementById("thesis-form-error").textContent = "";
     document.getElementById("thesis-dialog").showModal();
+    const meta = document.getElementById("thesis-proposal-meta");
+    meta.textContent = "Gerando proposta a partir dos dados do sistema...";
+    try {
+        const response = await fetch(`/api/teses/${encodeURIComponent(item.ticker)}/proposta`);
+        if (!response.ok) throw new Error(response.status);
+        const proposal = await response.json();
+        document.getElementById("thesis-summary").value = proposal.summary;
+        document.getElementById("thesis-horizon").value = proposal.horizon;
+        document.getElementById("thesis-risks").value = (proposal.risks || []).join("\n");
+        document.getElementById("thesis-triggers").value = (proposal.review_triggers || []).join("\n");
+        meta.textContent = `Confianca ${proposal.confidence} · dados de ${proposal.evidence_date || "data indisponivel"} · proposta automatica, nao recomendacao.`;
+    } catch {
+        document.getElementById("thesis-summary").value = item.thesis_summary || "";
+        document.getElementById("thesis-risks").value = (item.risks || []).join("\n");
+        document.getElementById("thesis-triggers").value = (item.review_triggers || []).join("\n");
+        meta.textContent = "Proposta quantitativa indisponivel; exibindo o rascunho basico.";
+    }
 }
 
 function resetarFormularioTese() {
@@ -137,6 +149,7 @@ function resetarFormularioTese() {
     document.getElementById("thesis-decision").required = false;
     document.getElementById("thesis-decision-wrapper").classList.add("hidden");
     document.getElementById("thesis-form-error").textContent = "";
+    document.getElementById("thesis-proposal-meta").textContent = "";
 }
 
 document.getElementById("thesis-close").addEventListener("click", () => {

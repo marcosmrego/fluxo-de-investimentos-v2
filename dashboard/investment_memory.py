@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import Enum
+import math
 from typing import Any, Iterable
 
 
@@ -24,6 +25,80 @@ _RISKS_BY_TYPE = {
     "REIT": ["Juros", "Vacancia e cambio"],
     "BDR": ["Risco do emissor", "Cambio e liquidez local"],
 }
+
+
+def _number(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _pt(value: float, suffix: str = "") -> str:
+    return f"{value:.2f}".replace(".", ",") + suffix
+
+
+def generate_fundamental_proposal(
+    position: dict[str, Any], indicators: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Generate a factual, reproducible draft from currently stored metrics."""
+    ticker = _ticker(position.get("ticker"))
+    asset_type = str(position.get("asset_type") or "NAO_CLASSIFICADO").upper()
+    source = indicators or {}
+    metric_specs = {
+        "p_l": ("P/L", ""),
+        "p_vp": ("P/VP", ""),
+        "roe": ("ROE", "%"),
+        "roic": ("ROIC", "%"),
+        "dividend_yield": ("DY", "%"),
+        "div_liq_patrim": ("divida liquida/patrimonio", ""),
+        "cres_rec_5a": ("crescimento de receita em 5 anos", "%"),
+    }
+    metrics = {
+        key: value for key in metric_specs
+        if (value := _number(source.get(key))) is not None
+    }
+    facts = [
+        f"{label} {_pt(metrics[key], suffix)}"
+        for key, (label, suffix) in metric_specs.items() if key in metrics
+    ]
+    name = str(position.get("name") or ticker).strip()
+    sector = str(position.get("sector") or "setor nao classificado").strip()
+    if facts:
+        summary = (
+            f"Proposta automatica para revisar {name} ({ticker}), exposicao a {sector}. "
+            f"Dados observados: {', '.join(facts)}. "
+            "Esta leitura e descritiva e precisa ser confrontada com a estrategia da carteira."
+        )
+    else:
+        summary = (
+            f"Proposta inicial para revisar {name} ({ticker}), exposicao a {sector}. "
+            "Nao ha fundamentos estruturados suficientes para uma avaliacao quantitativa."
+        )
+    count = len(metrics)
+    confidence = "alta" if count >= 5 else "moderada" if count >= 2 else "baixa"
+    gaps = [] if indicators else ["fundamentos indisponiveis"]
+    return {
+        "ticker": ticker,
+        "summary": summary,
+        "horizon": "A definir apos revisao da estrategia pessoal",
+        "risks": list(_RISKS_BY_TYPE.get(
+            asset_type, ["Riscos especificos ainda precisam ser revisados"]
+        )),
+        "review_triggers": [
+            "Nova divulgacao de resultados ou relatorio gerencial",
+            "Mudanca material nos indicadores usados nesta proposta",
+            "Alteracao relevante do peso ou papel do ativo na carteira",
+        ],
+        "metrics": metrics,
+        "confidence": confidence,
+        "evidence_date": str(source.get("data_coleta")) if source.get("data_coleta") else None,
+        "data_gaps": gaps,
+        "methodology": "Proposta deterministica baseada nos dados estruturados mais recentes; nao e recomendacao.",
+    }
 
 
 def create_initial_thesis_draft(
