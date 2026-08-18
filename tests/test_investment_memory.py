@@ -42,6 +42,9 @@ def test_inventory_distinguishes_contemporary_from_reconstructed_theses():
             "summary": "Posicao inicial em mineracao.",
             "recorded_at": "2026-08-18T10:00:00-03:00",
             "decision_at": "2026-08-18T10:00:00-03:00",
+            "horizon": "2 a 4 anos",
+            "risks": ["Queda do minerio"],
+            "review_triggers": ["Resultado trimestral"],
         },
         {
             "ticker": "VALE3",
@@ -49,6 +52,9 @@ def test_inventory_distinguishes_contemporary_from_reconstructed_theses():
             "summary": "Tese atual registrada depois da compra.",
             "recorded_at": "2026-08-18T10:00:00-03:00",
             "decision_at": None,
+            "horizon": "longo prazo",
+            "risks": ["China"],
+            "review_triggers": ["Mudanca da tese"],
         },
     ]
 
@@ -101,3 +107,75 @@ def test_inventory_rejects_unknown_thesis_origin_instead_of_guessing():
 
     with pytest.raises(ValueError, match="invalid thesis origin"):
         build_investment_inventory(positions, theses)
+
+
+@pytest.mark.parametrize("decision_at", ["ontem", "2026-08-18T10:00:00"])
+def test_contemporary_thesis_requires_valid_timezone_aware_decision(decision_at):
+    positions = [{"ticker": "CMIN3", "quantity": 10, "market_value": 57.50}]
+    theses = [{
+        "ticker": "CMIN3",
+        "origin": ThesisOrigin.CONTEMPORARY.value,
+        "summary": "Compra inicial.",
+        "recorded_at": "2026-08-18T11:00:00-03:00",
+        "decision_at": decision_at,
+        "horizon": "2 a 4 anos",
+        "risks": ["Minerio"],
+        "review_triggers": ["Resultado trimestral"],
+    }]
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        build_investment_inventory(positions, theses)
+
+
+def test_contemporary_thesis_cannot_be_recorded_before_the_decision():
+    positions = [{"ticker": "CMIN3", "quantity": 10, "market_value": 57.50}]
+    theses = [{
+        "ticker": "CMIN3",
+        "origin": ThesisOrigin.CONTEMPORARY.value,
+        "summary": "Compra inicial.",
+        "recorded_at": "2026-08-18T09:00:00-03:00",
+        "decision_at": "2026-08-18T10:00:00-03:00",
+        "horizon": "2 a 4 anos",
+        "risks": ["Minerio"],
+        "review_triggers": ["Resultado trimestral"],
+    }]
+
+    with pytest.raises(ValueError, match="before decision_at"):
+        build_investment_inventory(positions, theses)
+
+
+def test_thesis_is_not_complete_when_minimum_decision_fields_are_missing():
+    positions = [{"ticker": "VALE3", "quantity": 5, "market_value": 300.00}]
+    theses = [{
+        "ticker": "VALE3",
+        "origin": ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+        "summary": "   ",
+        "recorded_at": "2026-08-18T10:00:00-03:00",
+        "decision_at": None,
+        "horizon": None,
+        "risks": [],
+        "review_triggers": [],
+    }]
+
+    inventory = build_investment_inventory(positions, theses)
+
+    assert inventory["positions"][0]["has_complete_thesis"] is False
+    assert inventory["coverage"]["complete_theses"] == 0
+
+
+@pytest.mark.parametrize("quantity", [float("nan"), float("inf"), "invalid"])
+def test_inventory_rejects_invalid_position_quantities(quantity):
+    positions = [{"ticker": "CMIN3", "quantity": quantity, "market_value": 57.50}]
+
+    with pytest.raises(ValueError, match="invalid quantity"):
+        build_investment_inventory(positions, theses=[])
+
+
+def test_inventory_rejects_duplicate_open_positions_until_identity_is_canonical():
+    positions = [
+        {"ticker": "CMIN3", "quantity": 5, "market_value": 28.75},
+        {"ticker": "CMIN3", "quantity": 5, "market_value": 28.75},
+    ]
+
+    with pytest.raises(ValueError, match="duplicate open position"):
+        build_investment_inventory(positions, theses=[])
