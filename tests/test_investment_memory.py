@@ -4,6 +4,7 @@ from dashboard.investment_memory import (
     ThesisOrigin,
     build_investment_inventory,
     create_initial_thesis_draft,
+    validate_thesis_publication,
 )
 
 
@@ -237,3 +238,54 @@ def test_unknown_draft_does_not_require_or_claim_a_recorded_thesis_timestamp():
     assert inventory["positions"][0]["thesis_origin"] == "ORIGEM_DESCONHECIDA"
     assert inventory["positions"][0]["thesis_recorded_at"] is None
     assert inventory["positions"][0]["is_original_decision_memory"] is False
+
+
+def test_reconstructed_thesis_publication_requires_complete_human_review():
+    result = validate_thesis_publication({
+        "origin": ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+        "summary": "Banco rentavel usado como exposicao financeira da carteira.",
+        "horizon": "5 anos ou mais",
+        "risks": ["Deterioracao de credito", "Interferencia politica"],
+        "review_triggers": ["ROE abaixo do limite definido"],
+    })
+
+    assert result["status"] == "PUBLICADA"
+    assert result["origin"] == ThesisOrigin.RECONSTRUCTED_CURRENT.value
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("summary", "curta"),
+        ("horizon", " "),
+        ("risks", []),
+        ("risks", [" "]),
+        ("review_triggers", []),
+    ],
+)
+def test_thesis_publication_rejects_incomplete_fields(field, value):
+    payload = {
+        "origin": ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+        "summary": "Tese revisada manualmente com contexto suficiente para acompanhamento.",
+        "horizon": "longo prazo",
+        "risks": ["Risco material revisado"],
+        "review_triggers": ["Mudanca material dos fundamentos"],
+    }
+    payload[field] = value
+
+    with pytest.raises(ValueError, match=field):
+        validate_thesis_publication(payload)
+
+
+def test_contemporary_publication_requires_decision_timestamp():
+    payload = {
+        "origin": ThesisOrigin.CONTEMPORARY.value,
+        "summary": "Tese contemporanea revisada no momento da nova decisao de aporte.",
+        "horizon": "2 a 4 anos",
+        "risks": ["Risco de commodity"],
+        "review_triggers": ["Resultado trimestral"],
+        "decision_at": None,
+    }
+
+    with pytest.raises(ValueError, match="decision_at"):
+        validate_thesis_publication(payload)

@@ -90,3 +90,33 @@ def test_thesis_inventory_endpoint_returns_real_portfolio_coverage(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == expected
+
+
+def test_publish_thesis_endpoint_validates_and_persists_review(monkeypatch):
+    main = _load_app(monkeypatch)
+    captured = {}
+
+    def fake_publish(ticker, payload):
+        captured.update({"ticker": ticker, "payload": payload})
+        return {"ticker": ticker, "status": "PUBLICADA", "versao": 1}
+
+    monkeypatch.setattr(main, "publish_position_thesis", fake_publish)
+    payload = {
+        "origin": "TESE_ATUAL_RECONSTRUIDA",
+        "summary": "Tese revisada manualmente com informacao suficiente para acompanhar.",
+        "horizon": "longo prazo",
+        "risks": ["Risco material"],
+        "review_triggers": ["Mudanca dos fundamentos"],
+    }
+
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/api/teses/BBAS3/publicar",
+            json=payload,
+            headers=_basic("investidor", "segredo-de-teste"),
+        )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "PUBLICADA"
+    assert captured["ticker"] == "BBAS3"
+    assert captured["payload"]["origin"] == "TESE_ATUAL_RECONSTRUIDA"
