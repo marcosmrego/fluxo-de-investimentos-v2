@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 import math
@@ -42,13 +42,13 @@ def _pt(value: float, suffix: str = "") -> str:
 
 
 def generate_fundamental_proposal(
-    position: dict[str, Any], indicators: dict[str, Any] | None
+    position: dict[str, Any], indicators: dict[str, Any] | None, *, as_of: str | None = None
 ) -> dict[str, Any]:
     """Generate a factual, reproducible draft from currently stored metrics."""
     ticker = _ticker(position.get("ticker"))
     asset_type = str(position.get("asset_type") or "NAO_CLASSIFICADO").upper()
     source = indicators or {}
-    metric_specs = {
+    all_specs = {
         "p_l": ("P/L", ""),
         "p_vp": ("P/VP", ""),
         "roe": ("ROE", "%"),
@@ -56,14 +56,20 @@ def generate_fundamental_proposal(
         "dividend_yield": ("DY", "%"),
         "div_liq_patrim": ("divida liquida/patrimonio", ""),
         "cres_rec_5a": ("crescimento de receita em 5 anos", "%"),
+        "osc_12m": ("oscilacao em 12 meses", "%"),
     }
+    applicable = {
+        "ACAO": ("p_l", "p_vp", "roe", "roic", "dividend_yield", "div_liq_patrim", "cres_rec_5a"),
+        "BDR": ("p_l", "p_vp", "roe", "roic", "dividend_yield", "div_liq_patrim", "cres_rec_5a"),
+        "FII": ("p_vp", "dividend_yield", "osc_12m"),
+    }.get(asset_type, ())
     metrics = {
-        key: value for key in metric_specs
+        key: value for key in applicable
         if (value := _number(source.get(key))) is not None
     }
     facts = [
         f"{label} {_pt(metrics[key], suffix)}"
-        for key, (label, suffix) in metric_specs.items() if key in metrics
+        for key, (label, suffix) in all_specs.items() if key in metrics
     ]
     name = str(position.get("name") or ticker).strip()
     sector = str(position.get("sector") or "setor nao classificado").strip()
@@ -78,9 +84,37 @@ def generate_fundamental_proposal(
             f"Proposta inicial para revisar {name} ({ticker}), exposicao a {sector}. "
             "Nao ha fundamentos estruturados suficientes para uma avaliacao quantitativa."
         )
-    count = len(metrics)
-    confidence = "alta" if count >= 5 else "moderada" if count >= 2 else "baixa"
-    gaps = [] if indicators else ["fundamentos indisponiveis"]
+    evidence_date = None
+    evidence_age_days = None
+    if source.get("data_coleta"):
+        try:
+            evidence_date = date.fromisoformat(str(source["data_coleta"])[:10])
+            reference_date = date.fromisoformat(as_of) if as_of else date.today()
+            evidence_age_days = (reference_date - evidence_date).days
+        except ValueError:
+            evidence_date = None
+    if not applicable:
+        gaps = [f"analise fundamental nao suportada para {asset_type}"]
+        confidence = "baixa"
+    else:
+        gaps = [key for key in applicable if key not in metrics]
+        if not indicators:
+            gaps.insert(0, "fundamentos indisponiveis")
+        coverage = len(metrics) / len(applicable)
+        fresh = evidence_age_days is not None and 0 <= evidence_age_days <= 7
+        acceptable = evidence_age_days is not None and 0 <= evidence_age_days <= 30
+        confidence = (
+            "alta" if coverage >= 0.7 and fresh
+            else "moderada" if coverage >= 0.4 and acceptable
+            else "baixa"
+        )
+    triggers_by_type = {
+        "ACAO": ["Nova divulgacao de resultados", "Mudanca material nos indicadores usados nesta proposta"],
+        "BDR": ["Nova divulgacao de resultados", "Mudanca material nos indicadores ou no cambio"],
+        "FII": ["Novo relatorio gerencial", "Mudanca material em vacancia, rendimentos ou valor patrimonial"],
+        "ETF": ["Mudanca no indice, estrategia ou composicao do fundo"],
+        "RENDA_FIXA": ["Mudanca de credito do emissor, liquidez ou proximidade do vencimento"],
+    }
     return {
         "ticker": ticker,
         "summary": summary,
@@ -88,14 +122,13 @@ def generate_fundamental_proposal(
         "risks": list(_RISKS_BY_TYPE.get(
             asset_type, ["Riscos especificos ainda precisam ser revisados"]
         )),
-        "review_triggers": [
-            "Nova divulgacao de resultados ou relatorio gerencial",
-            "Mudanca material nos indicadores usados nesta proposta",
-            "Alteracao relevante do peso ou papel do ativo na carteira",
-        ],
+        "review_triggers": triggers_by_type.get(asset_type, [
+            "Revisao manual dos eventos relevantes para esta classe"
+        ]) + ["Alteracao relevante do peso ou papel do ativo na carteira"],
         "metrics": metrics,
         "confidence": confidence,
-        "evidence_date": str(source.get("data_coleta")) if source.get("data_coleta") else None,
+        "evidence_date": evidence_date.isoformat() if evidence_date else None,
+        "evidence_age_days": evidence_age_days,
         "data_gaps": gaps,
         "methodology": "Proposta deterministica baseada nos dados estruturados mais recentes; nao e recomendacao.",
     }

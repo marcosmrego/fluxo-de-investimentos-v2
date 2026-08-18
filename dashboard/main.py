@@ -179,12 +179,12 @@ def load_automatic_thesis_proposal(ticker: str) -> dict:
         row = conn.execute(text("""
             SELECT p.ticker, a.nome, a.tipo, a.setor,
                    i.p_l, i.p_vp, i.roe, i.roic, i.dividend_yield,
-                   i.div_liq_patrim, i.cres_rec_5a, i.data_coleta
+                   i.div_liq_patrim, i.cres_rec_5a, i.osc_12m, i.data_coleta
             FROM investimentos.posicoes p
             LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
             LEFT JOIN LATERAL (
                 SELECT p_l, p_vp, roe, roic, dividend_yield,
-                       div_liq_patrim, cres_rec_5a, data_coleta
+                       div_liq_patrim, cres_rec_5a, osc_12m, data_coleta
                 FROM investimentos.indicadores_fundamentalistas_v2
                 WHERE ticker = p.ticker ORDER BY data_coleta DESC LIMIT 1
             ) i ON true
@@ -198,7 +198,7 @@ def load_automatic_thesis_proposal(ticker: str) -> dict:
     }, {
         key: row[key] for key in (
             "p_l", "p_vp", "roe", "roic", "dividend_yield",
-            "div_liq_patrim", "cres_rec_5a", "data_coleta",
+            "div_liq_patrim", "cres_rec_5a", "osc_12m", "data_coleta",
         )
     } if row["data_coleta"] else None)
 

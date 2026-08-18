@@ -117,8 +117,13 @@ function linhas(text) {
     return String(text || "").split("\n").map(item => item.trim()).filter(Boolean);
 }
 
+let thesisProposalController = null;
+
 async function abrirRevisaoTese(item) {
     if (!item) return;
+    if (thesisProposalController) thesisProposalController.abort();
+    thesisProposalController = new AbortController();
+    const requestController = thesisProposalController;
     resetarFormularioTese();
     document.getElementById("thesis-ticker").value = item.ticker;
     document.getElementById("thesis-dialog-title").textContent = `Revisar ${item.ticker}`;
@@ -126,15 +131,22 @@ async function abrirRevisaoTese(item) {
     const meta = document.getElementById("thesis-proposal-meta");
     meta.textContent = "Gerando proposta a partir dos dados do sistema...";
     try {
-        const response = await fetch(`/api/teses/${encodeURIComponent(item.ticker)}/proposta`);
+        const response = await fetch(`/api/teses/${encodeURIComponent(item.ticker)}/proposta`, {
+            signal: requestController.signal,
+        });
         if (!response.ok) throw new Error(response.status);
         const proposal = await response.json();
+        if (requestController !== thesisProposalController
+            || document.getElementById("thesis-ticker").value !== item.ticker
+            || !document.getElementById("thesis-dialog").open) return;
         document.getElementById("thesis-summary").value = proposal.summary;
         document.getElementById("thesis-horizon").value = proposal.horizon;
         document.getElementById("thesis-risks").value = (proposal.risks || []).join("\n");
         document.getElementById("thesis-triggers").value = (proposal.review_triggers || []).join("\n");
         meta.textContent = `Confianca ${proposal.confidence} · dados de ${proposal.evidence_date || "data indisponivel"} · proposta automatica, nao recomendacao.`;
-    } catch {
+    } catch (exception) {
+        if (exception.name === "AbortError") return;
+        if (document.getElementById("thesis-ticker").value !== item.ticker) return;
         document.getElementById("thesis-summary").value = item.thesis_summary || "";
         document.getElementById("thesis-risks").value = (item.risks || []).join("\n");
         document.getElementById("thesis-triggers").value = (item.review_triggers || []).join("\n");
@@ -153,6 +165,7 @@ function resetarFormularioTese() {
 }
 
 document.getElementById("thesis-close").addEventListener("click", () => {
+    if (thesisProposalController) thesisProposalController.abort();
     document.getElementById("thesis-dialog").close();
 });
 

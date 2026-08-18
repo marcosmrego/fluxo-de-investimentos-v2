@@ -37,3 +37,5 @@ def test_review_dialog_prefills_automatic_explainable_proposal():
     assert "/api/teses/${encodeURIComponent(item.ticker)}/proposta" in javascript
     assert "proposal.confidence" in javascript
     assert 'document.getElementById("thesis-summary").value = proposal.summary' in javascript
+    assert "AbortController" in javascript
+    assert "thesis-ticker" in javascript and "item.ticker" in javascript

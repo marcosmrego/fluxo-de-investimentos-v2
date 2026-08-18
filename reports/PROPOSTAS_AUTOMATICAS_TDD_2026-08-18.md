@@ -8,8 +8,8 @@ Como investidor, quero abrir uma posição e receber a ficha previamente preench
 
 - RED: importação de `generate_fundamental_proposal` falhou antes da implementação.
 - GREEN direcionado: 38 testes aprovados.
-- GREEN completo: 76 testes aprovados, 1 aviso externo.
-- Validação PostgreSQL real: BBAS3 e CMIG4 geraram propostas de confiança alta com dados de 01/08/2026; SPXB11 declarou fundamentos ausentes e confiança baixa.
+- GREEN completo: 78 testes aprovados, 1 aviso externo.
+- Validação PostgreSQL real após revisão: BBAS3 e HGLG11 receberam confiança moderada porque os dados têm 17 dias; lacunas foram listadas por classe. SPXB11 declarou análise fundamental não suportada para ETF e confiança baixa.
 
 ## Garantias
 
@@ -21,6 +21,8 @@ Como investidor, quero abrir uma posição e receber a ficha previamente preench
 | Texto não contém instrução de compra ou venda | PASS |
 | Formulário recebe resumo, horizonte, riscos e gatilhos automaticamente | PASS |
 | Falha da proposta mantém o rascunho básico como fallback | PASS |
+| Confiança considera cobertura, classe do ativo e idade dos dados | PASS |
+| Respostas atrasadas não podem preencher o formulário de outro ticker | PASS |
 
 ## Arquitetura
 

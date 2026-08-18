@@ -315,6 +315,7 @@ def test_fundamental_proposal_explains_available_data_without_recommending_trade
         {"ticker": "CMIG4", "name": "Cemig", "asset_type": "ACAO", "sector": "Energia"},
         {"p_l": 6.71, "p_vp": 1.12, "roe": 16.7, "dividend_yield": 9.3,
          "div_liq_patrim": 0.62, "data_coleta": "2026-08-01"},
+        as_of="2026-08-02",
     )
 
     assert proposal["confidence"] == "alta"
@@ -334,5 +335,31 @@ def test_fundamental_proposal_exposes_missing_data_instead_of_inventing_values()
 
     assert proposal["confidence"] == "baixa"
     assert proposal["metrics"] == {}
-    assert "fundamentos indisponiveis" in proposal["data_gaps"]
+    assert "analise fundamental nao suportada para ETF" in proposal["data_gaps"]
     assert "A definir" in proposal["horizon"]
+
+
+def test_proposal_confidence_falls_for_stale_and_partial_data():
+    proposal = generate_fundamental_proposal(
+        {"ticker": "BBAS3", "asset_type": "ACAO", "sector": "Bancos"},
+        {"p_l": 8.5, "p_vp": None, "roe": None, "data_coleta": "2026-01-01"},
+        as_of="2026-08-18",
+    )
+
+    assert proposal["confidence"] == "baixa"
+    assert proposal["evidence_age_days"] == 229
+    assert "p_vp" in proposal["data_gaps"]
+    assert "roe" in proposal["data_gaps"]
+
+
+def test_fii_proposal_uses_fii_metrics_and_declares_missing_fields():
+    proposal = generate_fundamental_proposal(
+        {"ticker": "HGLG11", "asset_type": "FII", "sector": "Logistica"},
+        {"p_vp": 0.89, "dividend_yield": 8.9, "osc_12m": 5.51,
+         "data_coleta": "2026-08-01"},
+        as_of="2026-08-18",
+    )
+
+    assert set(proposal["metrics"]) == {"p_vp", "dividend_yield", "osc_12m"}
+    assert "p_l" not in proposal["data_gaps"]
+    assert "relatorio gerencial" in " ".join(proposal["review_triggers"]).lower()
