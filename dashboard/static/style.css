@@ -425,6 +425,15 @@ header h1 { font-size: 25px; letter-spacing: -.8px; }
 .status-chip i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .status-ok { color: var(--positive); }
 .status-sem_cotacao, .status-sem_cadastro { color: var(--warning); }
+.button-primary, .button-secondary { border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 9px 13px; font: 700 12px 'Inter', sans-serif; cursor: pointer; }
+.button-primary { color: white; background: var(--accent); }
+.button-secondary { color: var(--accent); background: var(--surface); }
+.thesis-dialog { width: min(720px, calc(100vw - 32px)); border: 1px solid var(--border); border-radius: var(--radius); padding: 0; color: var(--text); background: var(--surface); }
+.thesis-dialog::backdrop { background: rgba(20, 32, 29, .55); }
+.thesis-dialog form { display: grid; gap: 14px; padding: 24px; }
+.thesis-dialog .section-heading { padding: 0 0 8px; }
+.thesis-dialog label { display: grid; gap: 6px; color: var(--text-2); font-size: 12px; font-weight: 700; }
+.thesis-dialog input, .thesis-dialog textarea, .thesis-dialog select { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px; color: var(--text); background: var(--surface); font: 500 13px 'Inter', sans-serif; }
 
 .card, .kpi-card { box-shadow: 0 1px 0 rgba(25,44,40,.03); }
 .quality-card { border-left: 4px solid var(--accent); }

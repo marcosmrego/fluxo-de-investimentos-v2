@@ -243,9 +243,23 @@
         </div>
         <section class="card position-card">
             <div class="section-heading"><div><span class="eyebrow">Cobertura da carteira</span><h2>Fila de revisao</h2></div><span id="thesis-count">—</span></div>
-            <div class="table-wrap"><table id="table-theses"><thead><tr><th>Ativo</th><th>Tipo / setor</th><th>Origem</th><th>Estado</th><th>Tese inicial</th><th>Riscos iniciais</th></tr></thead><tbody></tbody></table></div>
+            <div class="table-wrap"><table id="table-theses"><thead><tr><th>Ativo</th><th>Tipo / setor</th><th>Origem</th><th>Estado</th><th>Tese inicial</th><th>Riscos iniciais</th><th></th></tr></thead><tbody></tbody></table></div>
             <p class="caption">Rascunhos usam somente a classificacao atual da carteira. Nenhuma recomendacao ou tese historica e inferida automaticamente.</p>
         </section>
+        <dialog id="thesis-dialog" class="thesis-dialog">
+            <form id="thesis-form">
+                <input type="hidden" id="thesis-ticker">
+                <div class="section-heading"><div><span class="eyebrow">Revisao humana</span><h2 id="thesis-dialog-title">Publicar tese</h2></div><button type="button" id="thesis-close" class="button-secondary">Fechar</button></div>
+                <label>Origem<select id="thesis-origin" required><option value="TESE_ATUAL_RECONSTRUIDA">Tese atual reconstruida</option><option value="TESE_CONTEMPORANEA">Tese contemporanea</option></select></label>
+                <label>Resumo da tese<textarea id="thesis-summary" rows="5" minlength="20" required></textarea></label>
+                <label>Horizonte<input id="thesis-horizon" required placeholder="Ex.: 3 a 5 anos"></label>
+                <label>Riscos, um por linha<textarea id="thesis-risks" rows="4" required></textarea></label>
+                <label>Gatilhos de revisao, um por linha<textarea id="thesis-triggers" rows="4" required></textarea></label>
+                <label id="thesis-decision-wrapper" class="hidden">Data e hora da decisao<input id="thesis-decision" type="datetime-local"></label>
+                <p id="thesis-form-error" class="caption negative"></p>
+                <button type="submit" class="button-primary">Publicar versao 1</button>
+            </form>
+        </dialog>
     </div>
 </main>
 

@@ -39,8 +39,9 @@ def test_inventory_distinguishes_contemporary_from_reconstructed_theses():
     ]
     theses = [
         {
-            "ticker": "CMIN3",
-            "origin": ThesisOrigin.CONTEMPORARY.value,
+                "ticker": "CMIN3",
+                "origin": ThesisOrigin.CONTEMPORARY.value,
+                "status": "PUBLICADA",
             "summary": "Posicao inicial em mineracao.",
             "recorded_at": "2026-08-18T10:00:00-03:00",
             "decision_at": "2026-08-18T10:00:00-03:00",
@@ -49,8 +50,9 @@ def test_inventory_distinguishes_contemporary_from_reconstructed_theses():
             "review_triggers": ["Resultado trimestral"],
         },
         {
-            "ticker": "VALE3",
-            "origin": ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+                "ticker": "VALE3",
+                "origin": ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+                "status": "PUBLICADA",
             "summary": "Tese atual registrada depois da compra.",
             "recorded_at": "2026-08-18T10:00:00-03:00",
             "decision_at": None,

@@ -57,6 +57,57 @@ def create_initial_thesis_draft(
     }
 
 
+def _text_list(value: Any, field: str) -> list[str]:
+    if not isinstance(value, list):
+        raise ValueError(f"{field} must be a list of non-empty texts")
+    cleaned = [str(item).strip() for item in value if str(item).strip()]
+    if not cleaned:
+        raise ValueError(f"{field} must contain at least one non-empty text")
+    return cleaned
+
+
+def validate_thesis_publication(
+    payload: dict[str, Any], *, recorded_at: str | None = None
+) -> dict[str, Any]:
+    """Validate the human-reviewed content that can become an immutable version."""
+
+    origin = payload.get("origin")
+    allowed = {
+        ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+        ThesisOrigin.CONTEMPORARY.value,
+    }
+    if origin not in allowed:
+        raise ValueError("origin must identify a reviewed thesis")
+
+    summary = str(payload.get("summary") or "").strip()
+    if len(summary) < 20:
+        raise ValueError("summary must contain at least 20 characters")
+    horizon = str(payload.get("horizon") or "").strip()
+    if not horizon:
+        raise ValueError("horizon is required")
+
+    result = {
+        "origin": origin,
+        "status": "PUBLICADA",
+        "summary": summary,
+        "horizon": horizon,
+        "risks": _text_list(payload.get("risks"), "risks"),
+        "review_triggers": _text_list(
+            payload.get("review_triggers"), "review_triggers"
+        ),
+        "decision_at": payload.get("decision_at"),
+    }
+    if origin == ThesisOrigin.CONTEMPORARY.value:
+        if not result["decision_at"]:
+            raise ValueError("decision_at is required for contemporary thesis")
+        decision = _aware_datetime(result["decision_at"], "decision_at", "thesis")
+        if recorded_at:
+            recorded = _aware_datetime(recorded_at, "recorded_at", "thesis")
+            if recorded - decision > timedelta(hours=24):
+                raise ValueError("contemporary thesis must be published within 24 hours")
+    return result
+
+
 def _ticker(value: Any) -> str:
     ticker = str(value or "").strip().upper()
     if not ticker:
@@ -87,7 +138,7 @@ def _positive_quantity(value: Any, ticker: str) -> Decimal:
 def _is_complete_thesis(thesis: dict[str, Any] | None) -> bool:
     if not thesis or thesis.get("origin") == ThesisOrigin.UNKNOWN.value:
         return False
-    if thesis.get("status", "PUBLICADA") != "PUBLICADA":
+    if thesis.get("status") != "PUBLICADA":
         return False
     risks = thesis.get("risks")
     review_triggers = thesis.get("review_triggers")

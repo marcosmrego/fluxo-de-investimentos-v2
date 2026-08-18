@@ -3,10 +3,13 @@
 import os
 import base64
 import binascii
+import json
 import secrets
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
+from pydantic import BaseModel
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import URL, create_engine, text
@@ -15,6 +18,7 @@ from dashboard.metrics import percentage_change, portfolio_weight
 from dashboard.investment_memory import (
     build_investment_inventory,
     create_initial_thesis_draft,
+    validate_thesis_publication,
 )
 from dashboard.portfolio_health import compute_portfolio_health
 
@@ -168,6 +172,55 @@ def load_position_thesis_inventory():
     return build_investment_inventory(normalized, theses)
 
 
+class ThesisPublicationRequest(BaseModel):
+    origin: str
+    summary: str
+    horizon: str
+    risks: list[str]
+    review_triggers: list[str]
+    decision_at: str | None = None
+
+
+def publish_position_thesis(ticker: str, payload: dict) -> dict:
+    """Publish the first reviewed version of an existing portfolio draft."""
+    normalized_ticker = ticker.strip().upper()
+    recorded_at = datetime.now().astimezone().isoformat()
+    validated = validate_thesis_publication(payload, recorded_at=recorded_at)
+    with engine.begin() as conn:
+        row = conn.execute(text("""
+            UPDATE investimentos.teses_investimento
+            SET origem = :origem,
+                status = 'PUBLICADA',
+                resumo = :resumo,
+                horizonte = :horizonte,
+                riscos = CAST(:riscos AS jsonb),
+                gatilhos_revisao = CAST(:gatilhos AS jsonb),
+                decisao_em = CAST(:decisao_em AS timestamptz),
+                registrada_em = CAST(:registrada_em AS timestamptz),
+                atualizado_em = now()
+            WHERE ticker = :ticker AND status = 'RASCUNHO'
+            RETURNING ticker, versao, origem, status, registrada_em
+        """), {
+            "ticker": normalized_ticker,
+            "origem": validated["origin"],
+            "resumo": validated["summary"],
+            "horizonte": validated["horizon"],
+            "riscos": json.dumps(validated["risks"]),
+            "gatilhos": json.dumps(validated["review_triggers"]),
+            "decisao_em": validated["decision_at"],
+            "registrada_em": recorded_at,
+        }).mappings().first()
+    if not row:
+        raise LookupError(f"open thesis draft not found for {normalized_ticker}")
+    return {
+        "ticker": row["ticker"],
+        "versao": row["versao"],
+        "origin": row["origem"],
+        "status": row["status"],
+        "recorded_at": row["registrada_em"].isoformat(),
+    }
+
+
 # ── Endpoints ──────────────────────────────────────────────────
 
 @app.get("/api/status")
@@ -302,6 +355,16 @@ async def filtros():
 async def teses_inventario():
     """Cobertura inicial de teses para todas as posicoes abertas."""
     return load_position_thesis_inventory()
+
+
+@app.post("/api/teses/{ticker}/publicar")
+async def publicar_tese(ticker: str, request: ThesisPublicationRequest):
+    try:
+        return publish_position_thesis(ticker, request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.get("/api/distribuicao")

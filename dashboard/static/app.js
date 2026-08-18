@@ -101,11 +101,78 @@ async function carregarTeses() {
                 <td><span class="status-chip status-sem_cotacao"><i></i>${item.has_complete_thesis ? "Publicada" : "Rascunho"}</span></td>
                 <td>${safe(item.thesis_summary)}</td>
                 <td>${safe((item.risks || []).join("; "))}</td>
+                <td><button class="button-secondary thesis-review" data-ticker="${safe(item.ticker)}">${item.has_complete_thesis ? "Ver" : "Revisar"}</button></td>
             </tr>`).join("");
+        document.querySelectorAll(".thesis-review").forEach(button => {
+            button.addEventListener("click", () => abrirRevisaoTese(
+                d.positions.find(item => item.ticker === button.dataset.ticker)
+            ));
+        });
     } catch {
         registrarErro("teses da carteira");
     }
 }
+
+function linhas(text) {
+    return String(text || "").split("\n").map(item => item.trim()).filter(Boolean);
+}
+
+function abrirRevisaoTese(item) {
+    if (!item) return;
+    document.getElementById("thesis-ticker").value = item.ticker;
+    document.getElementById("thesis-dialog-title").textContent = `Revisar ${item.ticker}`;
+    document.getElementById("thesis-summary").value = item.thesis_summary || "";
+    document.getElementById("thesis-horizon").value = "";
+    document.getElementById("thesis-risks").value = (item.risks || []).join("\n");
+    document.getElementById("thesis-triggers").value = (item.review_triggers || []).join("\n");
+    document.getElementById("thesis-form-error").textContent = "";
+    document.getElementById("thesis-dialog").showModal();
+}
+
+document.getElementById("thesis-close").addEventListener("click", () => {
+    document.getElementById("thesis-dialog").close();
+});
+
+document.getElementById("thesis-origin").addEventListener("change", event => {
+    const contemporary = event.target.value === "TESE_CONTEMPORANEA";
+    document.getElementById("thesis-decision-wrapper").classList.toggle("hidden", !contemporary);
+    document.getElementById("thesis-decision").required = contemporary;
+});
+
+document.getElementById("thesis-form").addEventListener("submit", async event => {
+    event.preventDefault();
+    const ticker = document.getElementById("thesis-ticker").value;
+    const origin = document.getElementById("thesis-origin").value;
+    const localDecision = document.getElementById("thesis-decision").value;
+    const payload = {
+        origin,
+        summary: document.getElementById("thesis-summary").value,
+        horizon: document.getElementById("thesis-horizon").value,
+        risks: linhas(document.getElementById("thesis-risks").value),
+        review_triggers: linhas(document.getElementById("thesis-triggers").value),
+        decision_at: origin === "TESE_CONTEMPORANEA" && localDecision
+            ? new Date(localDecision).toISOString() : null,
+    };
+    const error = document.getElementById("thesis-form-error");
+    error.textContent = "";
+    try {
+        const res = await fetch(`/api/teses/${encodeURIComponent(ticker)}/publicar`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+            const body = await res.json();
+            throw new Error(body.detail || `Erro ${res.status}`);
+        }
+        document.getElementById("thesis-dialog").close();
+        tabsLoaded.teses = false;
+        await carregarTeses();
+        tabsLoaded.teses = true;
+    } catch (exception) {
+        error.textContent = exception.message;
+    }
+});
 
 async function carregarQualidade() {
     try {
