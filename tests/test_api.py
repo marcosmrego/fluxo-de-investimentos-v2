@@ -72,3 +72,21 @@ def test_startup_rejects_missing_auth_secret(monkeypatch):
         assert "DASHBOARD_PASSWORD" in str(exc)
     else:
         raise AssertionError("app accepted a missing dashboard password")
+
+
+def test_thesis_inventory_endpoint_returns_real_portfolio_coverage(monkeypatch):
+    main = _load_app(monkeypatch)
+    expected = {
+        "positions": [{"ticker": "CMIN3", "thesis_origin": "TESE_CONTEMPORANEA"}],
+        "coverage": {"open_positions": 1, "inventoried_positions": 1},
+    }
+    monkeypatch.setattr(main, "load_position_thesis_inventory", lambda: expected)
+
+    with TestClient(main.app) as client:
+        response = client.get(
+            "/api/teses/inventario",
+            headers=_basic("investidor", "segredo-de-teste"),
+        )
+
+    assert response.status_code == 200
+    assert response.json() == expected

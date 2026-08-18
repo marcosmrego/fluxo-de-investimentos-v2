@@ -3,6 +3,7 @@ import pytest
 from dashboard.investment_memory import (
     ThesisOrigin,
     build_investment_inventory,
+    create_initial_thesis_draft,
 )
 
 
@@ -197,3 +198,27 @@ def test_inventory_rejects_duplicate_open_positions_until_identity_is_canonical(
 
     with pytest.raises(ValueError, match="duplicate open position"):
         build_investment_inventory(positions, theses=[])
+
+
+def test_initial_draft_uses_only_position_classification_and_stays_incomplete():
+    position = {
+        "ticker": "BBAS3",
+        "name": "Banco do Brasil",
+        "asset_type": "ACAO",
+        "sector": "Financeiro/Bancos",
+    }
+
+    thesis = create_initial_thesis_draft(
+        position, recorded_at="2026-08-18T12:00:00-03:00"
+    )
+    inventory = build_investment_inventory(
+        [{"ticker": "BBAS3", "quantity": 100, "market_value": 2500}],
+        [thesis],
+    )
+
+    assert thesis["origin"] == ThesisOrigin.RECONSTRUCTED_CURRENT.value
+    assert thesis["status"] == "RASCUNHO"
+    assert "Financeiro/Bancos" in thesis["summary"]
+    assert thesis["risks"]
+    assert thesis["review_triggers"]
+    assert inventory["coverage"]["complete_theses"] == 0
