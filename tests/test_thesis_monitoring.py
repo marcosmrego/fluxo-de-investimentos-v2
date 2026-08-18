@@ -8,6 +8,13 @@ def test_first_monitoring_run_creates_baseline_without_alert():
     assert result["triggers"] == []
 
 
+def test_first_run_rejects_missing_price_instead_of_freezing_bad_baseline():
+    result = evaluate_thesis_monitoring(None, {"price": None, "data_age_days": 1}, "ACAO", 0)
+
+    assert result["status"] == "DADOS_INSUFICIENTES"
+    assert "preco_indisponivel" in result["triggers"]
+
+
 def test_stale_data_has_priority_over_market_movements():
     result = evaluate_thesis_monitoring(
         {"price": 10}, {"price": 20, "data_age_days": 31}, "ACAO", 10

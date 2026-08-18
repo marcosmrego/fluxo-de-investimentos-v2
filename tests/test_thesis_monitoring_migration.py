@@ -19,4 +19,6 @@ def test_cron_runs_monitoring_after_market_data_update():
     cron = (ROOT / "deploy/investimentos-jobs.cron").read_text(encoding="utf-8")
 
     assert "investimentos-monitoramento" in cron
-    assert "scripts/monitorar_teses.py" in cron
+    assert "-m scripts.monitorar_teses" in cron
+    assert "docker exec -w /opt/data/fluxo-de-investimentos-v2" in cron
+    assert "SHELL=/bin/bash" in cron
