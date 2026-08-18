@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS investimentos.teses_investimento (
     criado_em timestamp with time zone NOT NULL DEFAULT now(),
     atualizado_em timestamp with time zone NOT NULL DEFAULT now(),
     CHECK (status <> 'PUBLICADA' OR registrada_em IS NOT NULL),
+    CHECK (status <> 'RASCUNHO' OR origem = 'ORIGEM_DESCONHECIDA'),
     CHECK (origem <> 'TESE_CONTEMPORANEA' OR decisao_em IS NOT NULL)
 );
 

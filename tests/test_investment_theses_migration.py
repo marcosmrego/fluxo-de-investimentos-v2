@@ -17,6 +17,7 @@ def test_thesis_migration_persists_unknown_drafts_and_version_fields():
     assert "sugerida_em timestamp with time zone" in sql
     assert "registrada_em timestamp with time zone" in sql
     assert "CREATE UNIQUE INDEX" in sql
+    assert "status <> 'RASCUNHO' OR origem = 'ORIGEM_DESCONHECIDA'" in sql
 
 
 def test_thesis_migration_seeds_open_positions_as_unknown_not_reconstructed():
