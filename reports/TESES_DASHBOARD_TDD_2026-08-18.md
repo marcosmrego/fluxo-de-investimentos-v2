@@ -14,7 +14,7 @@ Resultado: erro de importação de `create_initial_thesis_draft`, ainda inexiste
 
 - Testes direcionados: 23 aprovados.
 - Suíte completa: 58 aprovados, 1 aviso externo de depreciação.
-- PostgreSQL real, somente leitura: 40 posições abertas e 40 inventariadas; CMIN3 ainda ausente.
+- PostgreSQL real após migração transacional: 40 posições abertas, 40 rascunhos persistidos como `ORIGEM_DESCONHECIDA`; CMIN3 ainda ausente.
 
 ## Garantias
 
@@ -28,7 +28,11 @@ Resultado: erro de importação de `create_initial_thesis_draft`, ainda inexiste
 
 ## Limites conscientes
 
-- Os rascunhos ainda não são persistidos; são derivados da classificação atual em cada leitura.
+- Os rascunhos são persistidos e possuem campos separados para sugestão e tese revisada.
 - Nenhum rascunho é apresentado como justificativa original ou recomendação.
 - CMIN3 será vinculada como decisão contemporânea depois que a operação entrar e houver persistência versionada.
 - Identidade continua consolidada por ticker até a ADR de instrumento, conta e carteira.
+
+## Revisão adversarial
+
+A primeira revisão rejeitou a geração efêmera de `TESE_ATUAL_RECONSTRUIDA`. A correção adicionou `migrations/20260818_investment_theses.sql`, semeou somente `ORIGEM_DESCONHECIDA` e fez o endpoint carregar registros estáveis. Sugestões não contam como teses publicadas.

@@ -4,7 +4,6 @@ import os
 import base64
 import binascii
 import secrets
-from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -108,24 +107,37 @@ def _one(rows, keys):
 
 
 def load_position_thesis_inventory():
-    """Build review drafts for every current open position."""
+    """Load stable thesis records and explicit suggestions for open positions."""
     with engine.connect() as conn:
         positions = _df(conn.execute(text("""
             SELECT p.ticker, p.quantidade_total, a.nome, a.tipo, a.setor,
-                   COALESCE(c.fechamento * p.quantidade_total, 0) AS valor
+                   COALESCE(c.fechamento * p.quantidade_total, 0) AS valor,
+                   t.origem, t.status, t.resumo, t.horizonte, t.riscos,
+                   t.gatilhos_revisao, t.sugestao_resumo, t.sugestao_riscos,
+                   t.decisao_em, t.registrada_em
             FROM investimentos.posicoes p
             LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
             LEFT JOIN LATERAL (
                 SELECT fechamento FROM investimentos.cotacoes
                 WHERE ticker = p.ticker ORDER BY data DESC LIMIT 1
             ) c ON true
+            LEFT JOIN LATERAL (
+                SELECT origem, status, resumo, horizonte, riscos,
+                       gatilhos_revisao, sugestao_resumo, sugestao_riscos,
+                       decisao_em, registrada_em
+                FROM investimentos.teses_investimento
+                WHERE ticker = p.ticker AND status IN ('RASCUNHO', 'PUBLICADA')
+                ORDER BY versao DESC LIMIT 1
+            ) t ON true
             WHERE p.quantidade_total > 0
             ORDER BY p.ticker
         """)).fetchall(), [
-            "ticker", "quantidade", "nome", "tipo", "setor", "valor"
+            "ticker", "quantidade", "nome", "tipo", "setor", "valor",
+            "origem", "status", "resumo", "horizonte", "riscos",
+            "gatilhos_revisao", "sugestao_resumo", "sugestao_riscos",
+            "decisao_em", "registrada_em",
         ])
 
-    recorded_at = datetime.now().astimezone().isoformat()
     normalized = [{
         "ticker": row["ticker"],
         "quantity": row["quantidade"],
@@ -134,11 +146,26 @@ def load_position_thesis_inventory():
         "asset_type": row["tipo"],
         "sector": row["setor"],
     } for row in positions]
-    drafts = [
-        create_initial_thesis_draft(position, recorded_at=recorded_at)
-        for position in normalized
-    ]
-    return build_investment_inventory(normalized, drafts)
+    theses = []
+    for position, row in zip(normalized, positions):
+        if not row["origem"]:
+            theses.append(create_initial_thesis_draft(position, recorded_at=None))
+            continue
+        is_published = row["status"] == "PUBLICADA"
+        theses.append({
+            "ticker": row["ticker"],
+            "origin": row["origem"],
+            "status": row["status"],
+            "summary": row["resumo"] if is_published else row["sugestao_resumo"],
+            "horizon": row["horizonte"] if is_published else "A definir na revisao",
+            "risks": row["riscos"] if is_published else row["sugestao_riscos"],
+            "review_triggers": row["gatilhos_revisao"] if is_published else [
+                "Revisao manual da tese"
+            ],
+            "decision_at": row["decisao_em"].isoformat() if row["decisao_em"] else None,
+            "recorded_at": row["registrada_em"].isoformat() if row["registrada_em"] else None,
+        })
+    return build_investment_inventory(normalized, theses)
 
 
 # ── Endpoints ──────────────────────────────────────────────────

@@ -27,7 +27,7 @@ _RISKS_BY_TYPE = {
 
 
 def create_initial_thesis_draft(
-    position: dict[str, Any], *, recorded_at: str
+    position: dict[str, Any], *, recorded_at: str | None
 ) -> dict[str, Any]:
     """Create an honest review draft from classification data only."""
 
@@ -37,7 +37,7 @@ def create_initial_thesis_draft(
     sector = str(position.get("sector") or "setor nao classificado").strip()
     return {
         "ticker": ticker,
-        "origin": ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+        "origin": ThesisOrigin.UNKNOWN.value,
         "status": "RASCUNHO",
         "summary": (
             f"Tese inicial reconstruida para revisar o papel de {name} como "
@@ -119,7 +119,11 @@ def _index_theses(theses: Iterable[dict[str, Any]]) -> dict[str, dict[str, Any]]
         origin = thesis.get("origin")
         if origin not in valid_origins:
             raise ValueError(f"invalid thesis origin for {ticker}")
-        recorded_at = _aware_datetime(thesis.get("recorded_at"), "recorded_at", ticker)
+        recorded_at = None
+        if origin != ThesisOrigin.UNKNOWN.value:
+            recorded_at = _aware_datetime(
+                thesis.get("recorded_at"), "recorded_at", ticker
+            )
         if origin == ThesisOrigin.CONTEMPORARY.value and not thesis.get("decision_at"):
             raise ValueError(f"decision_at is required for contemporary thesis {ticker}")
         if origin == ThesisOrigin.CONTEMPORARY.value:
