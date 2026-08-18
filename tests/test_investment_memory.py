@@ -5,6 +5,7 @@ from dashboard.investment_memory import (
     build_investment_inventory,
     create_initial_thesis_draft,
     validate_thesis_publication,
+    generate_fundamental_proposal,
 )
 
 
@@ -307,3 +308,31 @@ def test_contemporary_publication_rejects_decision_more_than_24h_in_future():
         validate_thesis_publication(
             payload, recorded_at="2026-08-19T12:00:00-03:00"
         )
+
+
+def test_fundamental_proposal_explains_available_data_without_recommending_trade():
+    proposal = generate_fundamental_proposal(
+        {"ticker": "CMIG4", "name": "Cemig", "asset_type": "ACAO", "sector": "Energia"},
+        {"p_l": 6.71, "p_vp": 1.12, "roe": 16.7, "dividend_yield": 9.3,
+         "div_liq_patrim": 0.62, "data_coleta": "2026-08-01"},
+    )
+
+    assert proposal["confidence"] == "alta"
+    assert "P/L 6,71" in proposal["summary"]
+    assert "ROE 16,70%" in proposal["summary"]
+    assert proposal["evidence_date"] == "2026-08-01"
+    assert proposal["risks"]
+    assert "comprar" not in proposal["summary"].lower()
+    assert "vender" not in proposal["summary"].lower()
+
+
+def test_fundamental_proposal_exposes_missing_data_instead_of_inventing_values():
+    proposal = generate_fundamental_proposal(
+        {"ticker": "SPXB11", "name": "SPX Bovespa", "asset_type": "ETF", "sector": None},
+        None,
+    )
+
+    assert proposal["confidence"] == "baixa"
+    assert proposal["metrics"] == {}
+    assert "fundamentos indisponiveis" in proposal["data_gaps"]
+    assert "A definir" in proposal["horizon"]

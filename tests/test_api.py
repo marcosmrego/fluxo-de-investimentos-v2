@@ -120,3 +120,18 @@ def test_publish_thesis_endpoint_validates_and_persists_review(monkeypatch):
     assert response.json()["status"] == "PUBLICADA"
     assert captured["ticker"] == "BBAS3"
     assert captured["payload"]["origin"] == "TESE_ATUAL_RECONSTRUIDA"
+
+
+def test_automatic_thesis_proposal_endpoint_returns_explainable_evidence(monkeypatch):
+    main = _load_app(monkeypatch)
+    expected = {"ticker": "BBAS3", "confidence": "moderada", "metrics": {"p_l": 8.51}}
+    monkeypatch.setattr(main, "load_automatic_thesis_proposal", lambda ticker: expected)
+
+    with TestClient(main.app) as client:
+        response = client.get(
+            "/api/teses/BBAS3/proposta",
+            headers=_basic("investidor", "segredo-de-teste"),
+        )
+
+    assert response.status_code == 200
+    assert response.json() == expected
