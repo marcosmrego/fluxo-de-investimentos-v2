@@ -42,6 +42,7 @@
         <button class="tab-btn" data-tab="proventos" role="tab">Eventos</button>
         <button class="tab-btn" data-tab="rentabilidade" role="tab">Historico</button>
         <button class="tab-btn" data-tab="analise" role="tab">Fundamentos</button>
+        <button class="tab-btn" data-tab="teses" role="tab">Teses e decisoes</button>
     </nav>
 
     <!-- ── Tab: Início ──────────────────────────────── -->
@@ -223,6 +224,27 @@
             <h2>Preço-teto: aguardando dados suficientes</h2>
             <div class="table-wrap"><table id="table-bazin-graham"><thead><tr><th>Ativo</th><th>Bazin (R$)</th><th>Graham (R$)</th></tr></thead><tbody></tbody></table></div>
             <p class="caption">O sistema não calcula Bazin ou Graham enquanto LPA, VPA e dividendos por ação não estiverem disponíveis. Assim, não apresenta estimativas artificiais como preços reais.</p>
+        </section>
+    </div>
+
+    <div class="tab-panel" id="tab-teses">
+        <section class="position-hero">
+            <div>
+                <span class="eyebrow">Memoria de investimentos</span>
+                <h2>Teses e decisoes</h2>
+                <p class="hero-copy">Todas as posicoes abertas entram no inventario. Os registros iniciais sao rascunhos reconstruidos e nao representam a justificativa original da compra.</p>
+            </div>
+        </section>
+        <div class="position-summary" id="thesis-coverage">
+            <article><span>Posicoes abertas</span><strong id="thesis-open">—</strong><small>universo atual</small></article>
+            <article><span>Inventariadas</span><strong id="thesis-inventoried">—</strong><small>com lacuna explicita</small></article>
+            <article><span>Teses publicadas</span><strong id="thesis-complete">—</strong><small>prontas para acompanhamento</small></article>
+            <article class="attention-card"><span>Rascunhos pendentes</span><strong id="thesis-gaps">—</strong><small>exigem revisao humana</small></article>
+        </div>
+        <section class="card position-card">
+            <div class="section-heading"><div><span class="eyebrow">Cobertura da carteira</span><h2>Fila de revisao</h2></div><span id="thesis-count">—</span></div>
+            <div class="table-wrap"><table id="table-theses"><thead><tr><th>Ativo</th><th>Tipo / setor</th><th>Origem</th><th>Estado</th><th>Tese inicial</th><th>Riscos iniciais</th></tr></thead><tbody></tbody></table></div>
+            <p class="caption">Rascunhos usam somente a classificacao atual da carteira. Nenhuma recomendacao ou tese historica e inferida automaticamente.</p>
         </section>
     </div>
 </main>

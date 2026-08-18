@@ -16,6 +16,47 @@ class ThesisOrigin(str, Enum):
     UNKNOWN = "ORIGEM_DESCONHECIDA"
 
 
+_RISKS_BY_TYPE = {
+    "ACAO": ["Deterioracao operacional", "Valuation e risco especifico do emissor"],
+    "FII": ["Vacancia ou inadimplencia", "Juros e qualidade dos ativos"],
+    "ETF": ["Risco de mercado do indice", "Concentracao da carteira do fundo"],
+    "RENDA_FIXA": ["Credito do emissor", "Liquidez e marcacao a mercado"],
+    "REIT": ["Juros", "Vacancia e cambio"],
+    "BDR": ["Risco do emissor", "Cambio e liquidez local"],
+}
+
+
+def create_initial_thesis_draft(
+    position: dict[str, Any], *, recorded_at: str
+) -> dict[str, Any]:
+    """Create an honest review draft from classification data only."""
+
+    ticker = _ticker(position.get("ticker"))
+    name = str(position.get("name") or ticker).strip()
+    asset_type = str(position.get("asset_type") or "NAO_CLASSIFICADO").strip().upper()
+    sector = str(position.get("sector") or "setor nao classificado").strip()
+    return {
+        "ticker": ticker,
+        "origin": ThesisOrigin.RECONSTRUCTED_CURRENT.value,
+        "status": "RASCUNHO",
+        "summary": (
+            f"Tese inicial reconstruida para revisar o papel de {name} como "
+            f"exposicao a {sector}. Nao representa a justificativa original da compra."
+        ),
+        "recorded_at": recorded_at,
+        "decision_at": None,
+        "horizon": "A definir na revisao",
+        "risks": _RISKS_BY_TYPE.get(
+            asset_type, ["Riscos especificos ainda precisam ser revisados"]
+        ),
+        "review_triggers": [
+            "Revisao manual da tese",
+            "Mudanca material nos fundamentos ou na funcao do ativo na carteira",
+        ],
+        "source_scope": "classificacao_atual_da_carteira",
+    }
+
+
 def _ticker(value: Any) -> str:
     ticker = str(value or "").strip().upper()
     if not ticker:
@@ -45,6 +86,8 @@ def _positive_quantity(value: Any, ticker: str) -> Decimal:
 
 def _is_complete_thesis(thesis: dict[str, Any] | None) -> bool:
     if not thesis or thesis.get("origin") == ThesisOrigin.UNKNOWN.value:
+        return False
+    if thesis.get("status", "PUBLICADA") != "PUBLICADA":
         return False
     risks = thesis.get("risks")
     review_triggers = thesis.get("review_triggers")
@@ -118,6 +161,9 @@ def build_investment_inventory(
             "ticker": ticker,
             "thesis_origin": origin,
             "thesis_summary": thesis.get("summary") if thesis else None,
+            "thesis_status": thesis.get("status") if thesis else None,
+            "risks": list(thesis.get("risks") or []) if thesis else [],
+            "review_triggers": list(thesis.get("review_triggers") or []) if thesis else [],
             "thesis_recorded_at": thesis.get("recorded_at") if thesis else None,
             "decision_at": thesis.get("decision_at") if thesis else None,
             "is_original_decision_memory": origin == ThesisOrigin.CONTEMPORARY.value,

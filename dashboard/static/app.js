@@ -57,7 +57,7 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     });
 });
 
-let tabsLoaded = { inicio: false, posicoes: false, proventos: false, rentabilidade: false, analise: false };
+let tabsLoaded = { inicio: false, posicoes: false, proventos: false, rentabilidade: false, analise: false, teses: false };
 
 function carregarTab(tab) {
     if (tabsLoaded[tab]) return;
@@ -68,6 +68,7 @@ function carregarTab(tab) {
         case "proventos": carregarProventos(); break;
         case "rentabilidade": carregarRentabilidade(); break;
         case "analise": carregarAnalise(); break;
+        case "teses": carregarTeses(); break;
     }
 }
 
@@ -78,6 +79,32 @@ async function carregarInicio() {
     await carregarEvolucao();
     await carregarDistribuicao();
     await carregarTop5();
+}
+
+async function carregarTeses() {
+    try {
+        const res = await fetch(`${API_BASE}/api/teses/inventario`);
+        if (!res.ok) throw new Error(res.status);
+        const d = await res.json();
+        const coverage = document.getElementById("thesis-coverage");
+        coverage.dataset.loaded = "true";
+        document.getElementById("thesis-open").textContent = fmtInt(d.coverage.open_positions);
+        document.getElementById("thesis-inventoried").textContent = fmtInt(d.coverage.inventoried_positions);
+        document.getElementById("thesis-complete").textContent = fmtInt(d.coverage.complete_theses);
+        document.getElementById("thesis-gaps").textContent = fmtInt(d.coverage.explicit_gaps);
+        document.getElementById("thesis-count").textContent = `${fmtInt(d.positions.length)} ativos`;
+        document.querySelector("#table-theses tbody").innerHTML = d.positions.map(item => `
+            <tr class="${item.has_complete_thesis ? "" : "row-pending"}">
+                <td class="asset-cell"><strong>${safe(item.ticker)}</strong><small>${safe(item.name)}</small></td>
+                <td><span class="asset-type">${safe(item.asset_type || "—")}</span><small>${safe(item.sector || "Nao classificado")}</small></td>
+                <td>${safe(item.thesis_origin)}</td>
+                <td><span class="status-chip status-sem_cotacao"><i></i>${item.has_complete_thesis ? "Publicada" : "Rascunho"}</span></td>
+                <td>${safe(item.thesis_summary)}</td>
+                <td>${safe((item.risks || []).join("; "))}</td>
+            </tr>`).join("");
+    } catch {
+        registrarErro("teses da carteira");
+    }
 }
 
 async function carregarQualidade() {

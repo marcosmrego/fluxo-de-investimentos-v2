@@ -4,6 +4,7 @@ import os
 import base64
 import binascii
 import secrets
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -12,6 +13,10 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import URL, create_engine, text
 
 from dashboard.metrics import percentage_change, portfolio_weight
+from dashboard.investment_memory import (
+    build_investment_inventory,
+    create_initial_thesis_draft,
+)
 from dashboard.portfolio_health import compute_portfolio_health
 
 # ── DB Config ──────────────────────────────────────────────────
@@ -100,6 +105,40 @@ def _one(rows, keys):
     """Retorna primeiro resultado ou None."""
     arr = _df(rows, keys)
     return arr[0] if arr else None
+
+
+def load_position_thesis_inventory():
+    """Build review drafts for every current open position."""
+    with engine.connect() as conn:
+        positions = _df(conn.execute(text("""
+            SELECT p.ticker, p.quantidade_total, a.nome, a.tipo, a.setor,
+                   COALESCE(c.fechamento * p.quantidade_total, 0) AS valor
+            FROM investimentos.posicoes p
+            LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker
+            LEFT JOIN LATERAL (
+                SELECT fechamento FROM investimentos.cotacoes
+                WHERE ticker = p.ticker ORDER BY data DESC LIMIT 1
+            ) c ON true
+            WHERE p.quantidade_total > 0
+            ORDER BY p.ticker
+        """)).fetchall(), [
+            "ticker", "quantidade", "nome", "tipo", "setor", "valor"
+        ])
+
+    recorded_at = datetime.now().astimezone().isoformat()
+    normalized = [{
+        "ticker": row["ticker"],
+        "quantity": row["quantidade"],
+        "market_value": float(row["valor"] or 0),
+        "name": row["nome"],
+        "asset_type": row["tipo"],
+        "sector": row["setor"],
+    } for row in positions]
+    drafts = [
+        create_initial_thesis_draft(position, recorded_at=recorded_at)
+        for position in normalized
+    ]
+    return build_investment_inventory(normalized, drafts)
 
 
 # ── Endpoints ──────────────────────────────────────────────────
@@ -230,6 +269,12 @@ async def filtros():
             "SELECT DISTINCT a.setor FROM investimentos.posicoes p LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker WHERE a.setor IS NOT NULL ORDER BY a.setor"
         )).fetchall()]
     return {"tipos": tipos, "setores": setores}
+
+
+@app.get("/api/teses/inventario")
+async def teses_inventario():
+    """Cobertura inicial de teses para todas as posicoes abertas."""
+    return load_position_thesis_inventory()
 
 
 @app.get("/api/distribuicao")
