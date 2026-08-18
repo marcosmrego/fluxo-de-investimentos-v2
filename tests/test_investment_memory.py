@@ -216,9 +216,24 @@ def test_initial_draft_uses_only_position_classification_and_stays_incomplete():
         [thesis],
     )
 
-    assert thesis["origin"] == ThesisOrigin.RECONSTRUCTED_CURRENT.value
+    assert thesis["origin"] == ThesisOrigin.UNKNOWN.value
     assert thesis["status"] == "RASCUNHO"
     assert "Financeiro/Bancos" in thesis["summary"]
     assert thesis["risks"]
     assert thesis["review_triggers"]
     assert inventory["coverage"]["complete_theses"] == 0
+
+
+def test_unknown_draft_does_not_require_or_claim_a_recorded_thesis_timestamp():
+    thesis = create_initial_thesis_draft(
+        {"ticker": "VALE3", "asset_type": "ACAO", "sector": "Mineracao"},
+        recorded_at=None,
+    )
+
+    inventory = build_investment_inventory(
+        [{"ticker": "VALE3", "quantity": 6, "market_value": 350}], [thesis]
+    )
+
+    assert inventory["positions"][0]["thesis_origin"] == "ORIGEM_DESCONHECIDA"
+    assert inventory["positions"][0]["thesis_recorded_at"] is None
+    assert inventory["positions"][0]["is_original_decision_memory"] is False
