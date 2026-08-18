@@ -119,6 +119,7 @@ function linhas(text) {
 
 function abrirRevisaoTese(item) {
     if (!item) return;
+    resetarFormularioTese();
     document.getElementById("thesis-ticker").value = item.ticker;
     document.getElementById("thesis-dialog-title").textContent = `Revisar ${item.ticker}`;
     document.getElementById("thesis-summary").value = item.thesis_summary || "";
@@ -127,6 +128,15 @@ function abrirRevisaoTese(item) {
     document.getElementById("thesis-triggers").value = (item.review_triggers || []).join("\n");
     document.getElementById("thesis-form-error").textContent = "";
     document.getElementById("thesis-dialog").showModal();
+}
+
+function resetarFormularioTese() {
+    document.getElementById("thesis-form").reset();
+    document.getElementById("thesis-origin").value = "TESE_ATUAL_RECONSTRUIDA";
+    document.getElementById("thesis-decision").value = "";
+    document.getElementById("thesis-decision").required = false;
+    document.getElementById("thesis-decision-wrapper").classList.add("hidden");
+    document.getElementById("thesis-form-error").textContent = "";
 }
 
 document.getElementById("thesis-close").addEventListener("click", () => {

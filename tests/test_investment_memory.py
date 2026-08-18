@@ -291,3 +291,19 @@ def test_contemporary_publication_requires_decision_timestamp():
 
     with pytest.raises(ValueError, match="decision_at"):
         validate_thesis_publication(payload)
+
+
+def test_contemporary_publication_rejects_decision_more_than_24h_in_future():
+    payload = {
+        "origin": ThesisOrigin.CONTEMPORARY.value,
+        "summary": "Tese contemporanea revisada para uma decisao real de investimento.",
+        "horizon": "2 a 4 anos",
+        "risks": ["Risco material"],
+        "review_triggers": ["Resultado trimestral"],
+        "decision_at": "2026-08-20T12:00:01-03:00",
+    }
+
+    with pytest.raises(ValueError, match="24 hours"):
+        validate_thesis_publication(
+            payload, recorded_at="2026-08-19T12:00:00-03:00"
+        )

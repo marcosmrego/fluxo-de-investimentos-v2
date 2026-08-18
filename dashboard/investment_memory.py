@@ -103,7 +103,7 @@ def validate_thesis_publication(
         decision = _aware_datetime(result["decision_at"], "decision_at", "thesis")
         if recorded_at:
             recorded = _aware_datetime(recorded_at, "recorded_at", "thesis")
-            if recorded - decision > timedelta(hours=24):
+            if abs(recorded - decision) > timedelta(hours=24):
                 raise ValueError("contemporary thesis must be published within 24 hours")
     return result
 

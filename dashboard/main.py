@@ -187,31 +187,51 @@ def publish_position_thesis(ticker: str, payload: dict) -> dict:
     recorded_at = datetime.now().astimezone().isoformat()
     validated = validate_thesis_publication(payload, recorded_at=recorded_at)
     with engine.begin() as conn:
-        row = conn.execute(text("""
-            UPDATE investimentos.teses_investimento
-            SET origem = :origem,
-                status = 'PUBLICADA',
-                resumo = :resumo,
-                horizonte = :horizonte,
-                riscos = CAST(:riscos AS jsonb),
-                gatilhos_revisao = CAST(:gatilhos AS jsonb),
-                decisao_em = CAST(:decisao_em AS timestamptz),
-                registrada_em = CAST(:registrada_em AS timestamptz),
-                atualizado_em = now()
+        row = _publish_position_thesis_with_connection(
+            conn, normalized_ticker, validated, recorded_at
+        )
+    return row
+
+
+def _publish_position_thesis_with_connection(
+    conn, normalized_ticker: str, validated: dict, recorded_at: str
+) -> dict:
+    """Transactional writer extracted so PostgreSQL behavior can be rollback-tested."""
+    draft = conn.execute(text("""
+            SELECT id, versao FROM investimentos.teses_investimento
             WHERE ticker = :ticker AND status = 'RASCUNHO'
-            RETURNING ticker, versao, origem, status, registrada_em
-        """), {
-            "ticker": normalized_ticker,
-            "origem": validated["origin"],
-            "resumo": validated["summary"],
-            "horizonte": validated["horizon"],
-            "riscos": json.dumps(validated["risks"]),
-            "gatilhos": json.dumps(validated["review_triggers"]),
-            "decisao_em": validated["decision_at"],
-            "registrada_em": recorded_at,
-        }).mappings().first()
-    if not row:
+            FOR UPDATE
+    """), {"ticker": normalized_ticker}).mappings().first()
+    if not draft:
         raise LookupError(f"open thesis draft not found for {normalized_ticker}")
+    conn.execute(text("""
+            UPDATE investimentos.teses_investimento
+            SET status = 'SUBSTITUIDA', atualizado_em = now()
+            WHERE id = :id
+    """), {"id": draft["id"]})
+    row = conn.execute(text("""
+            INSERT INTO investimentos.teses_investimento (
+                ticker, versao, origem, status, resumo, horizonte, riscos,
+                gatilhos_revisao, decisao_em, registrada_em, substitui_id
+            ) VALUES (
+                :ticker, :versao, :origem, 'PUBLICADA', :resumo, :horizonte,
+                CAST(:riscos AS jsonb), CAST(:gatilhos AS jsonb),
+                CAST(:decisao_em AS timestamptz), CAST(:registrada_em AS timestamptz),
+                :substitui_id
+            )
+            RETURNING ticker, versao, origem, status, registrada_em
+    """), {
+        "ticker": normalized_ticker,
+        "versao": draft["versao"],
+        "origem": validated["origin"],
+        "resumo": validated["summary"],
+        "horizonte": validated["horizon"],
+        "riscos": json.dumps(validated["risks"]),
+        "gatilhos": json.dumps(validated["review_triggers"]),
+        "decisao_em": validated["decision_at"],
+        "registrada_em": recorded_at,
+        "substitui_id": draft["id"],
+    }).mappings().first()
     return {
         "ticker": row["ticker"],
         "versao": row["versao"],

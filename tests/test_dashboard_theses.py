@@ -28,3 +28,4 @@ def test_theses_tab_has_review_dialog_and_publishes_versioned_thesis():
     assert 'id="thesis-form"' in html
     assert "/api/teses/${encodeURIComponent(ticker)}/publicar" in javascript
     assert 'method: "POST"' in javascript
+    assert "resetarFormularioTese" in javascript
