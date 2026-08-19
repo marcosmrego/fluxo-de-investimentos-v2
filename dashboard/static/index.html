@@ -39,6 +39,7 @@
     <nav class="tabs-nav" role="tablist">
         <button class="tab-btn" data-tab="inicio" role="tab">Visao geral</button>
         <button class="tab-btn active" data-tab="posicoes" role="tab">Posicao atual</button>
+        <button class="tab-btn" id="notes-tab" data-tab="notas" role="tab" aria-selected="false" aria-controls="tab-notas" tabindex="-1">Notas</button>
         <button class="tab-btn" data-tab="proventos" role="tab">Eventos</button>
         <button class="tab-btn" data-tab="rentabilidade" role="tab">Historico</button>
         <button class="tab-btn" data-tab="analise" role="tab">Fundamentos</button>
@@ -148,6 +149,24 @@
         </section>
     </div>
 
+    <div class="tab-panel" id="tab-notas" role="tabpanel" aria-labelledby="notes-tab">
+        <section class="position-hero">
+            <div>
+                <p class="eyebrow">DOCUMENTOS DA CARTEIRA</p>
+                <h2>Notas de negociacao</h2>
+                <p class="hero-copy">Notas importadas e tentativas de processamento organizadas pela data do pregao. Falhas permanecem visiveis para conferencia.</p>
+            </div>
+        </section>
+        <div class="position-summary" id="notes-summary">
+            <article><span>Total</span><strong id="notes-total">—</strong><small>notas e tentativas</small></article>
+            <article><span>Importadas</span><strong id="notes-imported">—</strong><small>processamento concluido</small></article>
+            <article><span>Manuais</span><strong id="notes-manual">—</strong><small>sem e-mail associado</small></article>
+            <article class="attention-card"><span>Pendencias</span><strong id="notes-pending">—</strong><small>processando ou com erro</small></article>
+        </div>
+        <div id="notes-groups" class="notes-groups" aria-live="polite"></div>
+        <p id="notes-empty" class="notes-empty hidden">Nenhuma nota ou tentativa de importacao registrada.</p>
+    </div>
+
     <!-- ── Tab: Proventos ───────────────────────────── -->
     <div class="tab-panel" id="tab-proventos">
         <div class="filtros">
@@ -241,7 +260,7 @@
             <article><span>Teses publicadas</span><strong id="thesis-complete">—</strong><small>prontas para acompanhamento</small></article>
             <article class="attention-card"><span>Rascunhos pendentes</span><strong id="thesis-gaps">—</strong><small>exigem revisao humana</small></article>
         </div>
-        <section class="card position-card">
+        <section class="card position-card thesis-card">
             <div class="section-heading"><div><span class="eyebrow">Cobertura da carteira</span><h2>Fila de revisao</h2></div><span id="thesis-count">—</span></div>
             <div class="table-wrap"><table id="table-theses"><thead><tr><th>Ativo</th><th>Tipo / setor</th><th>Origem</th><th>Estado</th><th>Tese inicial</th><th>Riscos iniciais</th><th></th></tr></thead><tbody></tbody></table></div>
             <p class="caption">Rascunhos usam somente a classificacao atual da carteira. Nenhuma recomendacao ou tese historica e inferida automaticamente.</p>

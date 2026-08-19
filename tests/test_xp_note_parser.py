@@ -203,6 +203,57 @@ def test_asset_registration_precedes_note_write(monkeypatch, tmp_path):
     assert events == ["ativos", "nota", "posicoes", "commit"]
 
 
+def test_import_failure_persists_email_error_in_new_transaction(monkeypatch, tmp_path):
+    import processar_nota_xp
+
+    note = tmp_path / "nota.pdf"
+    note.write_bytes(b"%PDF-test")
+    events = []
+
+    class Connection:
+        def commit(self):
+            events.append("commit")
+
+        def rollback(self):
+            events.append("rollback")
+
+    parsed = {"header": {"numero_nota": "987654"}, "operacoes_brutas": []}
+    monkeypatch.setattr(processar_nota_xp, "parse_pdf", lambda *_: parsed)
+    monkeypatch.setattr(processar_nota_xp, "resolver_tickers", lambda ops, conn: ops)
+    monkeypatch.setattr(processar_nota_xp, "nota_ja_processada", lambda *_: False)
+    monkeypatch.setattr(processar_nota_xp, "garantir_cadastros_ativos", lambda *_: None)
+    monkeypatch.setattr(processar_nota_xp, "inserir_nota", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("db failure")))
+    monkeypatch.setattr(processar_nota_xp, "registrar_email_processado", lambda _conn, _email, _file, status, *_args, **_kwargs: events.append(status))
+
+    with pytest.raises(RuntimeError, match="db failure"):
+        processar_nota_xp.processar_pdf(note, Connection(), email_id="gmail-id")
+
+    assert events == ["processando", "rollback", "erro", "commit"]
+
+
+def test_parse_failure_is_recorded_without_replacing_original_error(monkeypatch, tmp_path):
+    import processar_nota_xp
+
+    note = tmp_path / "nota.pdf"
+    note.write_bytes(b"%PDF-test")
+    events = []
+
+    class Connection:
+        def commit(self):
+            events.append("commit")
+
+        def rollback(self):
+            events.append("rollback")
+
+    monkeypatch.setattr(processar_nota_xp, "parse_pdf", lambda *_: (_ for _ in ()).throw(ValueError("invalid pdf")))
+    monkeypatch.setattr(processar_nota_xp, "registrar_email_processado", lambda *_args, **_kwargs: events.append("erro"))
+
+    with pytest.raises(ValueError, match="invalid pdf"):
+        processar_nota_xp.processar_pdf(note, Connection(), email_id="gmail-id")
+
+    assert events == ["rollback", "erro", "commit"]
+
+
 def test_duplicate_note_is_considered_handled_by_gmail_importer(monkeypatch, tmp_path):
     import buscar_notas_gmail
 

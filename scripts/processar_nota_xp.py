@@ -583,32 +583,27 @@ def processar_pdf(pdf_path: Path, conn, password: Optional[str] = None,
     print(f"\n{'='*60}")
     print(f"Processando: {pdf_path.name}")
 
-    # 1. Parse
-    parsed = parse_pdf(pdf_path, password)
-    header = parsed.get("header", {})
-    numero_nota = header.get("numero_nota")
-
-    if not numero_nota:
-        print("  [ERRO] Número da nota não encontrado no PDF")
-        return False
-
-    # 2. Resolve tickers ausentes
-    operacoes_brutas = parsed.get("operacoes_brutas", [])
-    operacoes_brutas = resolver_tickers(operacoes_brutas, conn)
-    validar_operacoes_para_gravacao(operacoes_brutas)
-    parsed["operacoes_brutas"] = operacoes_brutas
-
-    # Re-consolida com tickers resolvidos
-    parsed["operacoes_consolidadas"] = _consolidate_ops(operacoes_brutas)
-
-    # 3. Verifica duplicata
-    if nota_ja_processada(conn, numero_nota):
-        print(f"  [PULAR] Nota {numero_nota} já existe no banco")
-        return False
-
-    # 3. Insere no banco (transação única)
-    nota_id = None
+    numero_nota = None
     try:
+        # Inclui parse e validação no limite de erro para que toda tentativa
+        # recebida por e-mail deixe um status auditável.
+        parsed = parse_pdf(pdf_path, password)
+        header = parsed.get("header", {})
+        numero_nota = header.get("numero_nota")
+        if not numero_nota:
+            raise ValueError("Número da nota não encontrado no PDF")
+
+        operacoes_brutas = resolver_tickers(
+            parsed.get("operacoes_brutas", []), conn
+        )
+        validar_operacoes_para_gravacao(operacoes_brutas)
+        parsed["operacoes_brutas"] = operacoes_brutas
+        parsed["operacoes_consolidadas"] = _consolidate_ops(operacoes_brutas)
+
+        if nota_ja_processada(conn, numero_nota):
+            print(f"  [PULAR] Nota {numero_nota} já existe no banco")
+            return False
+
         garantir_cadastros_ativos(conn, parsed.get("operacoes_brutas", []))
         # Registra email processado primeiro (FK constraint)
         if email_id:
@@ -628,16 +623,17 @@ def processar_pdf(pdf_path: Path, conn, password: Optional[str] = None,
         print(f"  [OK] Nota {numero_nota} processada com sucesso")
         return True
 
-    except Exception:
+    except Exception as original_error:
         conn.rollback()
         print(f"  [ERRO] Falha ao processar nota {numero_nota} — rollback executado")
         if email_id:
             try:
                 registrar_email_processado(conn, email_id, pdf_path.name,
-                                           "erro", str(sys.exc_info()[1]),
+                                           "erro", str(original_error),
                                            registro_id=email_uuid)
+                conn.commit()
             except Exception:
-                pass
+                conn.rollback()
         raise
 
 

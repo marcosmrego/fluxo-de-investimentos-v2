@@ -111,6 +111,117 @@ def _one(rows, keys):
     return arr[0] if arr else None
 
 
+def _iso(value):
+    """Serializa datas do banco sem expor detalhes de implementação."""
+    return value.isoformat() if value is not None else None
+
+
+def _number(value):
+    return float(value) if value is not None else None
+
+
+def load_negotiation_notes(limit: int = 100) -> dict:
+    """Carrega notas e tentativas de importação sem dados pessoais do PDF."""
+    with engine.connect() as conn:
+        notes = conn.execute(text("""
+            SELECT
+                n.id, n.data_pregao, n.criado_em, n.corretora,
+                n.numero_nota, n.email_id, n.valor_liquido_operacoes,
+                n.total_custos_despesas, n.liquido_para_valor,
+                COALESCE((
+                    SELECT jsonb_agg(jsonb_build_object(
+                        'ticker', oc.ticker,
+                        'description', oc.descricao_ativo,
+                        'side', oc.tipo_operacao,
+                        'market', oc.tipo_mercado,
+                        'quantity', oc.quantidade_total,
+                        'unit_price', oc.preco_unitario,
+                        'total_value', oc.valor_total
+                    ) ORDER BY oc.tipo_operacao, oc.ticker)
+                    FROM investimentos.operacoes_consolidadas_nota oc
+                    WHERE oc.nota_id = n.id
+                ), '[]'::jsonb) AS operations
+            FROM investimentos.notas_negociacao n
+            ORDER BY n.data_pregao DESC, n.criado_em DESC, n.id
+            LIMIT :limit
+        """), {"limit": limit}).mappings().all()
+        attempts = conn.execute(text("""
+            SELECT e.id, e.status_processamento, e.atualizado_em
+            FROM investimentos.emails_processados e
+            WHERE e.status_processamento IN ('processando', 'erro')
+              AND NOT EXISTS (
+                  SELECT 1 FROM investimentos.notas_negociacao n
+                  WHERE n.email_id = e.id
+              )
+            ORDER BY e.atualizado_em DESC, e.id
+            LIMIT :limit
+        """), {"limit": limit}).mappings().all()
+
+    items = []
+    for row in notes:
+        operations = row["operations"] or []
+        if isinstance(operations, str):
+            operations = json.loads(operations)
+        items.append({
+            "id": str(row["id"]),
+            "trade_date": _iso(row["data_pregao"]),
+            "attempted_at": _iso(row["criado_em"]),
+            "broker": row["corretora"],
+            "note_number": row["numero_nota"],
+            "status": "Imported" if row["email_id"] else "Manual",
+            "status_message": None,
+            "net_operations": _number(row["valor_liquido_operacoes"]),
+            "total_costs": _number(row["total_custos_despesas"]),
+            "settlement_value": _number(row["liquido_para_valor"]),
+            "operations": [{
+                "ticker": op.get("ticker"),
+                "description": op.get("description"),
+                "side": op.get("side"),
+                "market": op.get("market"),
+                "quantity": _number(op.get("quantity")),
+                "unit_price": _number(op.get("unit_price")),
+                "total_value": _number(op.get("total_value")),
+            } for op in operations],
+            "_group_date": _iso(row["data_pregao"]),
+        })
+
+    for row in attempts:
+        attempted_at = row["atualizado_em"]
+        status = "Processing" if row["status_processamento"] == "processando" else "Error"
+        items.append({
+            "id": f"attempt:{row['id']}",
+            "trade_date": None,
+            "attempted_at": _iso(attempted_at),
+            "broker": "XP INVESTIMENTOS",
+            "note_number": None,
+            "status": status,
+            "status_message": (
+                "Não foi possível importar esta nota." if status == "Error"
+                else "Importação em andamento."
+            ),
+            "net_operations": None,
+            "total_costs": None,
+            "settlement_value": None,
+            "operations": [],
+            "_group_date": attempted_at.date().isoformat() if attempted_at else None,
+        })
+
+    groups_by_date = {}
+    for item in items:
+        group_date = item.pop("_group_date")
+        groups_by_date.setdefault(group_date, []).append(item)
+    groups = [
+        {"date": group_date, "items": group_items}
+        for group_date, group_items in sorted(
+            groups_by_date.items(), key=lambda pair: pair[0] or "", reverse=True
+        )
+    ]
+    summary = {"total": len(items), "imported": 0, "processing": 0, "error": 0, "manual": 0}
+    for item in items:
+        summary[item["status"].lower()] += 1
+    return {"groups": groups, "summary": summary, "limit_per_source": limit}
+
+
 def load_position_thesis_inventory():
     """Load stable thesis records and explicit suggestions for open positions."""
     with engine.connect() as conn:
@@ -400,6 +511,12 @@ async def filtros():
             "SELECT DISTINCT a.setor FROM investimentos.posicoes p LEFT JOIN investimentos.ativos a ON a.ticker = p.ticker WHERE a.setor IS NOT NULL ORDER BY a.setor"
         )).fetchall()]
     return {"tipos": tipos, "setores": setores}
+
+
+@app.get("/api/notas")
+async def notas_negociacao(limit: int = Query(100, ge=1, le=500)):
+    """Histórico seguro de notas e tentativas de importação por data."""
+    return load_negotiation_notes(limit=limit)
 
 
 @app.get("/api/teses/inventario")

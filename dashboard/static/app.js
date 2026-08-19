@@ -51,13 +51,17 @@ document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.addEventListener("click", () => {
         document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
         document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+        document.querySelectorAll(".tab-btn").forEach(b => {
+            b.setAttribute("aria-selected", String(b === btn));
+            b.tabIndex = b === btn ? 0 : -1;
+        });
         btn.classList.add("active");
         document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
         carregarTab(btn.dataset.tab);
     });
 });
 
-let tabsLoaded = { inicio: false, posicoes: false, proventos: false, rentabilidade: false, analise: false, teses: false };
+let tabsLoaded = { inicio: false, posicoes: false, notas: false, proventos: false, rentabilidade: false, analise: false, teses: false };
 
 function carregarTab(tab) {
     if (tabsLoaded[tab]) return;
@@ -65,6 +69,7 @@ function carregarTab(tab) {
     switch (tab) {
         case "inicio": carregarInicio(); break;
         case "posicoes": carregarPosicoes(); break;
+        case "notas": carregarNotas(); break;
         case "proventos": carregarProventos(); break;
         case "rentabilidade": carregarRentabilidade(); break;
         case "analise": carregarAnalise(); break;
@@ -79,6 +84,67 @@ async function carregarInicio() {
     await carregarEvolucao();
     await carregarDistribuicao();
     await carregarTop5();
+}
+
+const NOTE_STATUS = {
+    Imported: { label: "Importada", className: "note-status-imported" },
+    Manual: { label: "Manual", className: "note-status-manual" },
+    Processing: { label: "Processando", className: "note-status-processing" },
+    Error: { label: "Erro", className: "note-status-error" },
+};
+
+function renderNote(item) {
+    const status = NOTE_STATUS[item.status] || NOTE_STATUS.Error;
+    const title = item.note_number ? `Nota ${safe(item.note_number)}` : "Tentativa de importacao";
+    const operations = item.operations || [];
+    const operationRows = operations.map(op => `
+        <tr>
+            <td class="asset-cell"><strong>${safe(op.ticker)}</strong><small>${safe(op.description)}</small></td>
+            <td>${safe(op.side)}</td><td>${safe(op.market)}</td>
+            <td class="numeric">${fmtQty(op.quantity)}</td>
+            <td class="numeric">${fmtBRL(op.unit_price)}</td>
+            <td class="numeric">${fmtBRL(op.total_value)}</td>
+        </tr>`).join("");
+    const details = operations.length ? `
+        <div class="note-details">
+            <div class="note-financials">
+                <span>Operacoes<strong>${fmtBRL(item.net_operations)}</strong></span>
+                <span>Custos<strong>${fmtBRL(item.total_costs)}</strong></span>
+                <span>Liquidacao<strong>${fmtBRL(item.settlement_value)}</strong></span>
+            </div>
+            <div class="table-wrap"><table><thead><tr><th>Ativo</th><th>Operacao</th><th>Mercado</th><th>Quantidade</th><th>Preco</th><th>Valor</th></tr></thead><tbody>${operationRows}</tbody></table></div>
+        </div>` : `<p class="note-message">${safe(item.status_message || "Nenhuma operacao consolidada registrada.")}</p>`;
+    return `
+        <details class="note-card">
+            <summary class="note-summary">
+                <span><strong>${title}</strong><small>${safe(item.broker || "Corretora nao informada")}</small></span>
+                <span class="status-chip ${status.className}"><i></i>${status.label}</span>
+                <span class="note-date">${item.trade_date ? "Pregao " + fmtDate(item.trade_date) : "Tentativa " + fmtDate(item.attempted_at)}</span>
+                <span class="note-total">${fmtBRL(item.settlement_value)}</span>
+            </summary>
+            ${details}
+        </details>`;
+}
+
+async function carregarNotas() {
+    try {
+        const res = await fetch(`${API_BASE}/api/notas`);
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        document.getElementById("notes-total").textContent = fmtInt(data.summary.total);
+        document.getElementById("notes-imported").textContent = fmtInt(data.summary.imported);
+        document.getElementById("notes-manual").textContent = fmtInt(data.summary.manual);
+        document.getElementById("notes-pending").textContent = fmtInt(data.summary.processing + data.summary.error);
+        const groups = data.groups || [];
+        document.getElementById("notes-empty").classList.toggle("hidden", groups.length > 0);
+        document.getElementById("notes-groups").innerHTML = groups.map(group => `
+            <section class="notes-group">
+                <div class="section-heading"><div><p class="eyebrow">DATA DE REFERENCIA</p><h2>${fmtDate(group.date)}</h2></div><span>${fmtInt(group.items.length)} registros</span></div>
+                <div>${group.items.map(renderNote).join("")}</div>
+            </section>`).join("");
+    } catch {
+        registrarErro("notas de negociacao");
+    }
 }
 
 async function carregarTeses() {
