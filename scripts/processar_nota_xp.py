@@ -38,6 +38,16 @@ DESCRICOES_B3_VERIFICADAS = {
     "SPACE X DRN": "SPCX34",
     "NU HOLDINGS DRN": "ROXO34",
     "BTG S&P 500 CI": "SPXB11",
+    "CSN MINERACAO ON N2": "CMIN3",
+    "CSN MINERACAO ON": "CMIN3",
+    "FII MAXI REN CI": "MXRF11",
+    "FII MAXI REN": "MXRF11",
+    "BRASIL ON NM": "BBAS3",
+    "BRASIL ON": "BBAS3",
+    "ABC BRASIL PN N2": "ABCB4",
+    "ABC BRASIL PN": "ABCB4",
+    "MARCOPOLO ON N2": "POMO3",
+    "MARCOPOLO ON": "POMO3",
 }
 
 ATIVOS_B3_VERIFICADOS = {
@@ -56,6 +66,11 @@ ATIVOS_B3_VERIFICADOS = {
         "tipo": "ETF",
         "setor": "Indice",
     },
+    "CMIN3": {"nome": "CSN Mineracao S.A.", "tipo": "ACAO", "setor": "Mineracao"},
+    "MXRF11": {"nome": "Maxi Renda FII", "tipo": "FII", "setor": "Imobiliario"},
+    "BBAS3": {"nome": "Banco do Brasil S.A.", "tipo": "ACAO", "setor": "Financeiro"},
+    "ABCB4": {"nome": "Banco ABC Brasil S.A.", "tipo": "ACAO", "setor": "Financeiro"},
+    "POMO3": {"nome": "Marcopolo S.A. ON", "tipo": "ACAO", "setor": "Industrial"},
 }
 
 
@@ -74,10 +89,7 @@ def _get_db_password() -> str:
 
 
 def _carregar_mapeamento_ativos(conn) -> dict:
-    """
-    Constrói um mapeamento palavra_chave → ticker a partir da tabela ativos.
-    Ex: 'JHSF' → 'JHSF3', 'KLABIN' → 'KLBN3', 'MARCOPOLO' → 'POMO4'
-    """
+    """Return only unique, exact identifiers from the asset registry."""
     cur = conn.cursor()
     cur.execute(
         "SELECT ticker, nome FROM investimentos.ativos WHERE monitorar = TRUE"
@@ -85,24 +97,17 @@ def _carregar_mapeamento_ativos(conn) -> dict:
     rows = cur.fetchall()
     cur.close()
 
-    mapeamento = {}
-    for ticker, nome in rows:
-        # Adiciona o próprio ticker (sem dígitos finais) como chave
-        base = ticker.rstrip('0123456789')  # Remove todos os dígitos do final
-        if base and len(base) >= 3:
-            mapeamento[base.upper()] = ticker
-
-        # Adiciona o ticker completo também
-        mapeamento[ticker.upper()] = ticker
-
-        # Extrai palavras do nome
-        if nome:
-            palavras = nome.upper().split()
-            for p in palavras:
-                if len(p) >= 3 and p not in ("S/A", "ON", "NM", "PN", "N1", "N2", "PART", "UNT", "EDJ", "EDR", "DR1", "DR2", "DR3", "CI", "EB", "ATZ", "ATZ"):
-                    mapeamento[p] = ticker
-
-    return mapeamento
+    candidates = {}
+    for ticker, name in rows:
+        for identifier in (ticker, name):
+            normalized = " ".join((identifier or "").upper().split())
+            if normalized:
+                candidates.setdefault(normalized, set()).add(ticker)
+    return {
+        identifier: next(iter(tickers))
+        for identifier, tickers in candidates.items()
+        if len(tickers) == 1
+    }
 
 
 def resolver_tickers(operacoes: list, conn) -> list:
@@ -128,28 +133,12 @@ def resolver_tickers(operacoes: list, conn) -> list:
             resolvidos += 1
             continue
 
-        primeira = desc.split()[0] if desc.split() else ""
-
-        # Estratégia 1: match exato da primeira palavra
-        if primeira in mapeamento:
-            op["ticker"] = mapeamento[primeira]
+        if desc in mapeamento:
+            op["ticker"] = mapeamento[desc]
             resolvidos += 1
-            continue
-
-        # Estratégia 2: match parcial (chave está contida na descrição)
-        for chave, ticker in mapeamento.items():
-            if chave in desc:
-                op["ticker"] = ticker
-                resolvidos += 1
-                break
-        else:
-            # Estratégia 3: quebrar palavra grudada (ex: "BBSEGURIDADE" → "BB", "SEGURIDADE")
-            # e tentar match com cada fragmento
-            for chave, ticker in mapeamento.items():
-                if len(chave) >= 4 and chave in primeira:
-                    op["ticker"] = ticker
-                    resolvidos += 1
-                    break
+        # Unknown descriptions deliberately remain unresolved. The validation
+        # gate then blocks the write instead of guessing from generic words.
+        continue
 
     if resolvidos > 0:
         print(f"  [RESOLVE] {resolvidos} ticker(s) resolvidos via tabela ativos")

@@ -139,6 +139,24 @@ def _operation(row: Sequence[object], indexes: dict[str, int]) -> dict:
     }
 
 
+def _looks_like_operation(
+    row: Sequence[object], indexes: dict[str, int] | None = None
+) -> bool:
+    """Identify plausible trade rows even when extraction lost a key cell."""
+    active_indexes = indexes or XP_OPERATION_COLUMNS
+    description = _cell(row, active_indexes["description"])
+    negotiation = _cell(row, active_indexes["negociacao"])
+    market = _cell(row, active_indexes["market"])
+    populated_financials = sum(
+        bool(_cell(row, active_indexes[key]))
+        for key in ("quantity", "price", "total")
+    )
+    has_exchange_marker = "BOVESPA" in negotiation.upper()
+    has_trade_context = has_exchange_marker or bool(market)
+    has_trade_identity = has_exchange_marker or bool(description)
+    return has_trade_identity and has_trade_context and populated_financials >= 2
+
+
 def _operations(tables: Iterable[Sequence[Sequence[object]]]) -> list[dict]:
     operations: list[dict] = []
     for table in tables:
@@ -152,7 +170,15 @@ def _operations(tables: Iterable[Sequence[Sequence[object]]]) -> list[dict]:
                 continue
             if indexes is None and len(row) >= 11 and _cell(row, 2).upper() in {"C", "V"}:
                 indexes = XP_OPERATION_COLUMNS
-            if indexes is None or not _cell(row, indexes["side"]):
+            if indexes is None and len(row) >= 11 and _looks_like_operation(row):
+                indexes = XP_OPERATION_COLUMNS
+            if indexes is None:
+                continue
+            if not _cell(row, indexes["side"]):
+                if _looks_like_operation(row, indexes):
+                    raise NoteParseError(
+                        "linha de operaÃ§Ã£o incompleta: campo C/V nÃ£o extraÃ­do"
+                    )
                 continue
             operations.append(_operation(row, indexes))
     if not operations:
@@ -160,14 +186,49 @@ def _operations(tables: Iterable[Sequence[Sequence[object]]]) -> list[dict]:
     return operations
 
 
-def parse_xp_document(text: str, tables: Iterable[Sequence[Sequence[object]]]) -> dict:
+def _financial_summary(text: str, operations: Sequence[dict]) -> dict:
+    normalized = _normalized(text)
+    match = re.search(
+        r"valor liquido das operacoes\s+([\d.]+,\d{2})\s*([dc])\b",
+        normalized,
+    )
+    if not match:
+        return {}
+    stated = _decimal_br(match.group(1))
+    stated_signed = stated if match.group(2).upper() == "C" else -stated
+    calculated = sum(
+        operation["valor_operacao"]
+        if operation["tipo_operacao"] == "VENDA"
+        else -operation["valor_operacao"]
+        for operation in operations
+    )
+    if abs(calculated - stated_signed) > MONEY_TOLERANCE:
+        raise NoteParseError(
+            "total liquido das operacoes nao reconcilia: "
+            f"operacoes={calculated} e resumo={stated_signed}"
+        )
+    return {"valor_liquido_operacoes": {"valor": stated, "dc": match.group(2).upper()}}
+
+
+def parse_xp_document(
+    text: str,
+    tables: Iterable[Sequence[Sequence[object]]],
+    *,
+    require_operation_summary: bool = False,
+) -> dict:
     """Parse already-extracted XP text/tables into the existing import contract."""
+    operations = _operations(tables)
+    financial = _financial_summary(text, operations)
+    if require_operation_summary and not financial:
+        raise NoteParseError(
+            "resumo de operacoes obrigatorio nao foi extraido"
+        )
     return {
         "success": True,
         "header": _header(text),
-        "financeiro": {},
-        "operacoes_brutas": _operations(tables),
-        "raw_text_preview": "",
+        "financeiro": financial,
+        "operacoes_brutas": operations,
+        "raw_text_preview": text[:2000],
     }
 
 
@@ -198,4 +259,8 @@ def parse_xp_pdf(pdf_path: Path, password: str | None = None) -> dict:
     except Exception as exc:
         raise NoteParseError("não foi possível abrir ou extrair a nota") from exc
 
-    return parse_xp_document("\n".join(texts), tables)
+    return parse_xp_document(
+        "\n".join(texts),
+        tables,
+        require_operation_summary=True,
+    )

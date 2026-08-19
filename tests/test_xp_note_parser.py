@@ -100,6 +100,125 @@ def test_parses_xp_table_when_pdf_omits_the_header_row():
     assert result["operacoes_brutas"][0]["tipo_operacao"] == "COMPRA"
 
 
+def test_rejects_financial_operation_row_when_side_was_not_extracted():
+    incomplete_cmin_row = OPERATIONS_TABLE[1].copy()
+    incomplete_cmin_row[2] = ""
+    incomplete_cmin_row[5] = "CSN MINERACAO ON N2"
+    table = [OPERATIONS_TABLE[0], OPERATIONS_TABLE[1], incomplete_cmin_row]
+
+    with pytest.raises(NoteParseError, match="linha de opera.*incompleta"):
+        parse_xp_document(HEADER_TEXT, [table])
+
+
+def test_rejects_headerless_operation_row_when_side_was_not_extracted():
+    incomplete = OPERATIONS_TABLE[1].copy()
+    incomplete[2] = ""
+    incomplete[5] = "CSN MINERACAO ON N2"
+
+    with pytest.raises(NoteParseError, match="linha de opera.*incompleta"):
+        parse_xp_document(HEADER_TEXT, [[incomplete]])
+
+
+def test_rejects_partial_plausible_operation_row_with_a_missing_price():
+    incomplete = OPERATIONS_TABLE[1].copy()
+    incomplete[2] = ""
+    incomplete[5] = "CSN MINERACAO ON N2"
+    incomplete[8] = ""
+    table = [OPERATIONS_TABLE[0], OPERATIONS_TABLE[1], incomplete]
+
+    with pytest.raises(NoteParseError, match="linha de opera.*incompleta"):
+        parse_xp_document(HEADER_TEXT, [table])
+
+
+def test_rejects_headerless_trade_when_side_and_description_were_lost():
+    incomplete = OPERATIONS_TABLE[1].copy()
+    incomplete[2] = ""
+    incomplete[5] = ""
+
+    with pytest.raises(NoteParseError, match="linha de opera.*incompleta"):
+        parse_xp_document(HEADER_TEXT, [[incomplete]])
+
+
+def test_rejects_note_when_extracted_net_operations_total_does_not_reconcile():
+    text = HEADER_TEXT + "\nValor liquido das operacoes 999,00 D\n"
+
+    with pytest.raises(NoteParseError, match="total liquido das operacoes nao reconcilia"):
+        parse_xp_document(text, [OPERATIONS_TABLE])
+
+
+def test_preserves_extracted_text_preview_for_audit():
+    result = parse_xp_document(HEADER_TEXT, [OPERATIONS_TABLE])
+
+    assert "987654" in result["raw_text_preview"]
+
+
+def test_production_completeness_mode_requires_operation_summary():
+    with pytest.raises(NoteParseError, match="resumo.*obrigatorio"):
+        parse_xp_document(
+            HEADER_TEXT,
+            [OPERATIONS_TABLE],
+            require_operation_summary=True,
+        )
+
+
+def test_synthetic_production_shape_reconciles_at_integration_boundary():
+    extracted_text = HEADER_TEXT + "\nValor liquido das operacoes 1.031,00 D\n"
+
+    result = parse_xp_document(
+        extracted_text,
+        [OPERATIONS_TABLE],
+        require_operation_summary=True,
+    )
+
+    assert len(result["operacoes_brutas"]) == 2
+    assert result["financeiro"]["valor_liquido_operacoes"] == {
+        "valor": Decimal("1031.00"),
+        "dc": "D",
+    }
+
+
+def test_pdf_import_enables_production_completeness_mode(monkeypatch, tmp_path):
+    import scripts.xp_note_parser as parser
+
+    note = tmp_path / "captured-note.pdf"
+    note.write_bytes(b"%PDF-test")
+    captured = {}
+
+    class Page:
+        def extract_text(self):
+            return HEADER_TEXT
+
+        def extract_tables(self):
+            return [OPERATIONS_TABLE]
+
+    class Document:
+        pages = [Page()]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+    class PdfPlumber:
+        @staticmethod
+        def open(*_args, **_kwargs):
+            return Document()
+
+    original = parser.parse_xp_document
+
+    def recording_parse(text, tables, **kwargs):
+        captured.update(kwargs)
+        return original(text, tables, **kwargs)
+
+    monkeypatch.setitem(sys.modules, "pdfplumber", PdfPlumber)
+    monkeypatch.setattr(parser, "parse_xp_document", recording_parse)
+
+    with pytest.raises(NoteParseError, match="resumo.*obrigatorio"):
+        parser.parse_xp_pdf(note)
+    assert captured == {"require_operation_summary": True}
+
+
 def test_processador_uses_local_parser(monkeypatch, tmp_path):
     import sys
     from pathlib import Path
@@ -155,6 +274,52 @@ def test_resolves_verified_b3_descriptions(description, ticker):
     import processar_nota_xp
 
     assert processar_nota_xp.ticker_oficial_por_descricao(description) == ticker
+
+
+@pytest.mark.parametrize(
+    "description,ticker",
+    [
+        ("CSN MINERACAO ON N2", "CMIN3"),
+        ("FII MAXI REN", "MXRF11"),
+        ("BRASIL ON", "BBAS3"),
+        ("ABC BRASIL PN", "ABCB4"),
+        ("MARCOPOLO ON", "POMO3"),
+    ],
+)
+def test_resolves_only_explicitly_verified_xp_descriptions(description, ticker):
+    import processar_nota_xp
+
+    assert processar_nota_xp.ticker_oficial_por_descricao(description) == ticker
+
+
+def test_generic_database_words_do_not_guess_a_ticker():
+    import processar_nota_xp
+
+    class Cursor:
+        def execute(self, *_args):
+            pass
+
+        def fetchall(self):
+            return [
+                ("KNRI11", "Kinea Renda Imobiliaria"),
+                ("SANB3", "Banco Santander Brasil"),
+            ]
+
+        def close(self):
+            pass
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+    operations = [
+        {"ticker": None, "descricao_ativo": "FII RENDA DESCONHECIDO CI"},
+        {"ticker": None, "descricao_ativo": "BRASIL HOLDINGS ON"},
+    ]
+
+    resolved = processar_nota_xp.resolver_tickers(operations, Connection())
+
+    assert [operation["ticker"] for operation in resolved] == [None, None]
 
 
 def test_verified_tickers_have_asset_metadata():
